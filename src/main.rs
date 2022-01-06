@@ -191,6 +191,42 @@ fn str_to_notes(bars: Vec<&str>) -> Vec<Division> {
     notes
 }
 
+#[derive(Debug)]
+struct Stop {
+    bar: f32,
+    time: f32,
+}
+impl FromStr for Stop {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut s = s.split("=");
+        let bar = s.next().unwrap().parse::<f32>().unwrap();
+        let time = s.next().unwrap().parse::<f32>().unwrap();
+        Ok(Stop {
+            bar: bar,
+            time: time,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct BPM {
+    bar: f32,
+    bpm: f32,
+}
+impl FromStr for BPM {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut s = s.split("=");
+        let bar = s.next().unwrap().parse::<f32>().unwrap();
+        let bpm = s.next().unwrap().parse::<f32>().unwrap();
+        Ok(BPM{
+            bar: bar,
+            bpm: bpm,
+        })
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = &args[1];
@@ -215,13 +251,20 @@ fn main() {
 
     let notes_content : Vec<&str> = props.get("NOTES").unwrap().split(":").collect();
 
-    let notes = ChartInfo {
+    let chart = ChartInfo {
         chart_type: ChartType::from_str(notes_content[0].trim_start()).unwrap(),
         difficulty: Difficulty::from_str(notes_content[2].trim_start()).unwrap(),
         level: notes_content[3].trim_start().parse().unwrap(),
         groove_radar: notes_content[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect(),
         notes: str_to_notes(notes_content[5].split(",").map(|s| s.trim_start()).collect())
     };
+    println!("chart:\n{:?}", chart);
 
-    println!("notes:\n{:?}", notes);
+    let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
+    let stops: Vec<Stop> = props.get("STOPS").unwrap().split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect();
+    println!("BPM:\n{:?}", bpms);
+    println!("stop:\n{:?}", stops);
+    
+    //println!("BPM:\n{:?}", props.get("BPMS"));
+    //println!("stop:\n{:?}", props.get("STOPS"));
 }
