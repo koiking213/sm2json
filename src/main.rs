@@ -10,7 +10,7 @@ use std::str::FromStr;
 static NOTE_UNIT: i32 = 192;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Color {
     Red,
     Blue,
@@ -30,7 +30,7 @@ fn ofs_to_color(ofs: i32) -> Color {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum Direction {
     Up,
     Down,
@@ -48,7 +48,7 @@ fn int_to_direction(i: i32) -> Direction {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum ArrowType {
     None, 
     Normal,
@@ -71,11 +71,11 @@ impl FromStr for ArrowType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Arrow {
     direction: Direction,
     arrow_type: ArrowType,
-    //end: f32,
+    end: i32,
     //end_time: f32
 }
 
@@ -92,7 +92,7 @@ fn make_arrows(s: &str) -> Vec<Arrow> {
         arrows.push(Arrow {
             direction: int_to_direction(i as i32),
             arrow_type: arrow_type,
-            //end: ofs + NOTE_UNIT / 4,
+            end: 0
             //end_time: ofs + NOTE_UNIT / 4
         });
         }
@@ -100,7 +100,7 @@ fn make_arrows(s: &str) -> Vec<Arrow> {
     arrows
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Division {
     arrows: Vec<Arrow>,
     color: Color,
@@ -180,6 +180,20 @@ struct ChartInfo {
     notes: Vec<Division>,
 }
 
+fn find_freeze_end(notes: &Vec<Division>, offset: i32, direction: Direction) -> i32 {
+    for division in notes {
+        if division.offset <= offset {
+            continue;
+        }
+        for arrow in &division.arrows {
+            if arrow.direction == direction && arrow.arrow_type == ArrowType::FreezeEnd {
+                return division.offset;
+            }
+        }
+    }
+    panic!("no freeze end found");
+}
+
 fn str_to_notes(bars: Vec<&str>) -> Vec<Division> {
     let mut notes: Vec<Division> = Vec::new();
     let mut offset = 0;
@@ -188,7 +202,29 @@ fn str_to_notes(bars: Vec<&str>) -> Vec<Division> {
         notes.extend(divisions);
         offset += NOTE_UNIT;
     }
-    notes
+    // calc freeze end timing
+    let mut notes_with_freeze_end: Vec<Division> = Vec::new();
+    for div in &notes {
+        assert_ne!(div.arrows.len(), 0);
+        let mut arrows: Vec<Arrow> = Vec::new();
+        for arrow in &div.arrows {
+            let mut end = 0;
+            if arrow.arrow_type == ArrowType::Freeze {
+                end = find_freeze_end(&notes, div.offset, arrow.direction);
+            }
+            arrows.push(Arrow {
+                direction: arrow.direction,
+                arrow_type: arrow.arrow_type,
+                end: end
+            });
+        }
+        notes_with_freeze_end.push(Division {
+            arrows: arrows,
+            color: div.color,
+            offset: div.offset,
+        });
+    }
+    notes_with_freeze_end
 }
 
 #[derive(Debug)]
@@ -254,6 +290,11 @@ fn main() {
 
     //println!("file content:\n{:?}", props);
 
+    let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
+    let stops: Vec<Stop> = props.get("STOPS").unwrap().split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect();
+    println!("BPM:\n{:?}", bpms);
+    println!("stop:\n{:?}", stops);
+
     let notes_content : Vec<Vec<&str>> = notes_strings.iter().map(|s| s.split(":").collect()).collect();
 
     let charts : Vec<ChartInfo> = notes_content.iter().map(|s| {
@@ -272,8 +313,10 @@ fn main() {
     }).collect();
     println!("charts:\n{:?}", charts);
 
-    let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
-    let stops: Vec<Stop> = props.get("STOPS").unwrap().split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect();
-    println!("BPM:\n{:?}", bpms);
-    println!("stop:\n{:?}", stops);
+
+    // fill end of freeze arrow
+    
+    //charts.iter_mut().map(|chart| {
+    //    let mut notes = chart.notes;
+    //});
 }
