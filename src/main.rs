@@ -163,7 +163,7 @@ impl FromStr for Difficulty{
             "Easy" => Ok(Difficulty::Easy),
             "Medium" => Ok(Difficulty::Medium),
             "Hard" => Ok(Difficulty::Hard),
-            "Expert" => Ok(Difficulty::Expert),
+            "Challenge" => Ok(Difficulty::Expert),
             "Edit" => Ok(Difficulty::Edit),
             _ => Err(format!("{} is not supported", s))
         }
@@ -237,6 +237,7 @@ fn main() {
     let contents_without_comment: String = statements_without_comment.join("\n");
     let statements = contents_without_comment.split(";");
     let mut props = HashMap::new();
+    let mut notes_strings = Vec::new();
     for statement in statements {
         let parts: Vec<&str> = statement.trim().split(":").collect();
         if parts.len() < 2 {
@@ -244,27 +245,35 @@ fn main() {
         }
         let key = parts[0].trim_matches('#');
         let value = parts[1..].join(":");
-        props.insert(key.to_string(), value.to_string());
+        if key == "NOTES" {
+            notes_strings.push(value.to_string());
+        } else {
+            props.insert(key.to_string(), value.to_string());
+        }
     }
 
     //println!("file content:\n{:?}", props);
 
-    let notes_content : Vec<&str> = props.get("NOTES").unwrap().split(":").collect();
+    let notes_content : Vec<Vec<&str>> = notes_strings.iter().map(|s| s.split(":").collect()).collect();
 
-    let chart = ChartInfo {
-        chart_type: ChartType::from_str(notes_content[0].trim_start()).unwrap(),
-        difficulty: Difficulty::from_str(notes_content[2].trim_start()).unwrap(),
-        level: notes_content[3].trim_start().parse().unwrap(),
-        groove_radar: notes_content[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect(),
-        notes: str_to_notes(notes_content[5].split(",").map(|s| s.trim_start()).collect())
-    };
-    println!("chart:\n{:?}", chart);
+    let charts : Vec<ChartInfo> = notes_content.iter().map(|s| {
+        let chart_type = ChartType::from_str(s[0].trim_start()).unwrap();
+        let difficulty = Difficulty::from_str(s[2].trim_start()).unwrap();
+        let level = s[3].trim_start().parse().unwrap();
+        let groove_radar = s[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect();
+        let notes = str_to_notes(s[5].split(",").map(|s| s.trim_start()).collect());
+        ChartInfo {
+            chart_type: chart_type,
+            difficulty: difficulty,
+            level: level,
+            groove_radar: groove_radar,
+            notes: notes,
+        }
+    }).collect();
+    println!("charts:\n{:?}", charts);
 
     let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
     let stops: Vec<Stop> = props.get("STOPS").unwrap().split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect();
     println!("BPM:\n{:?}", bpms);
     println!("stop:\n{:?}", stops);
-    
-    //println!("BPM:\n{:?}", props.get("BPMS"));
-    //println!("stop:\n{:?}", props.get("STOPS"));
 }
