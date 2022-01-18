@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::collections::HashMap;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 
 // bar: 4分が4つ入る単位
 // division: barを192分割して矢印があるところ
@@ -10,7 +11,7 @@ use std::str::FromStr;
 static NOTE_UNIT: i32 = 192;
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 enum Color {
     Red,
     Blue,
@@ -30,7 +31,7 @@ fn ofs_to_color(ofs: i32) -> Color {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
 enum Direction {
     Up,
     Down,
@@ -48,7 +49,7 @@ fn int_to_direction(i: i32) -> Direction {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
 enum ArrowType {
     None, 
     Normal,
@@ -71,7 +72,7 @@ impl FromStr for ArrowType {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 struct Arrow {
     direction: Direction,
     arrow_type: ArrowType,
@@ -100,12 +101,12 @@ fn make_arrows(s: &str) -> Vec<Arrow> {
     arrows
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Division {
     arrows: Vec<Arrow>,
     color: Color,
     offset: i32,
-    //time: f32,
+    time: f32,
 }
 
 fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
@@ -123,6 +124,7 @@ fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
                 arrows: arrows,
                 color: color,
                 offset: offset + ofs_in_bar,
+                time: 0.0
                 //time: offset + NOTE_UNIT / 4
             });
         }
@@ -130,7 +132,7 @@ fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
     divisions
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 enum ChartType {
     DanceSingle,
     DanceDouble,
@@ -147,7 +149,7 @@ impl FromStr for ChartType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 enum Difficulty {
     Easy,
     Medium,
@@ -170,7 +172,7 @@ impl FromStr for Difficulty{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 struct ChartInfo {
     chart_type: ChartType,
     difficulty: Difficulty,
@@ -194,7 +196,7 @@ fn find_freeze_end(notes: &Vec<Division>, offset: i32, direction: Direction) -> 
     panic!("no freeze end found");
 }
 
-fn str_to_notes(bars: Vec<&str>) -> Vec<Division> {
+fn str_to_notes(bars: Vec<&str>, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> Vec<Division> {
     let mut notes: Vec<Division> = Vec::new();
     let mut offset = 0;
     for bar in bars {
@@ -218,49 +220,81 @@ fn str_to_notes(bars: Vec<&str>) -> Vec<Division> {
                 end: end
             });
         }
-        notes_with_freeze_end.push(Division {
-            arrows: arrows,
-            color: div.color,
-            offset: div.offset,
-        });
+        // dont add if all arrows are freeze end
+        if arrows.iter().any(|x| x.arrow_type != ArrowType::FreezeEnd) {
+            notes_with_freeze_end.push(Division {
+                arrows: arrows,
+                color: div.color,
+                offset: div.offset,
+                time: offset_to_time(div.offset, bpms, stops)
+            });
+        }
     }
     notes_with_freeze_end
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Stop {
-    bar: f32,
+    offset: f32,
     time: f32,
 }
 impl FromStr for Stop {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut s = s.split("=");
-        let bar = s.next().unwrap().parse::<f32>().unwrap();
+        let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let time = s.next().unwrap().parse::<f32>().unwrap();
         Ok(Stop {
-            bar: bar,
+            offset: offset,
             time: time,
         })
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 struct BPM {
-    bar: f32,
+    offset: f32,
     bpm: f32,
 }
 impl FromStr for BPM {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut s = s.split("=");
-        let bar = s.next().unwrap().parse::<f32>().unwrap();
+        let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let bpm = s.next().unwrap().parse::<f32>().unwrap();
         Ok(BPM{
-            bar: bar,
+            offset: offset,
             bpm: bpm,
         })
     }
+}
+
+fn offset_to_time(offset: i32, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> f32 {
+    let mut time = 0.0;
+    let mut done = 0;
+    let mut prev_bpm = &bpms[0];
+    for bpm in bpms {
+        if bpm.offset >= offset as f32 {
+            let elapsed = (offset - done) as f32 / ((NOTE_UNIT / 4) as f32);
+            time += 60.0 / prev_bpm.bpm * elapsed;
+            break;
+        }
+        let elapsed = (bpm.offset - done as f32) / ((NOTE_UNIT / 4) as f32);
+        time += 60.0 / prev_bpm.bpm * elapsed;
+        done = bpm.offset as i32;
+        prev_bpm = bpm;
+    }
+    if bpms[bpms.len()-1].offset < offset as f32 {
+        let elapsed = (offset - done) as f32 / ((NOTE_UNIT / 4) as f32);
+        time += 60.0 / bpms[bpms.len()-1].bpm * elapsed;
+    }
+    for stop in stops {
+        if stop.offset >= offset as f32 {
+            break;
+        }
+        time += stop.time;
+    }
+    time
 }
 
 fn main() {
@@ -292,8 +326,8 @@ fn main() {
 
     let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
     let stops: Vec<Stop> = props.get("STOPS").unwrap().split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect();
-    println!("BPM:\n{:?}", bpms);
-    println!("stop:\n{:?}", stops);
+    //println!("BPM:\n{:?}", bpms);
+    //println!("stop:\n{:?}", stops);
 
     let notes_content : Vec<Vec<&str>> = notes_strings.iter().map(|s| s.split(":").collect()).collect();
 
@@ -302,7 +336,7 @@ fn main() {
         let difficulty = Difficulty::from_str(s[2].trim_start()).unwrap();
         let level = s[3].trim_start().parse().unwrap();
         let groove_radar = s[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect();
-        let notes = str_to_notes(s[5].split(",").map(|s| s.trim_start()).collect());
+        let notes = str_to_notes(s[5].split(",").map(|s| s.trim_start()).collect(), &bpms, &stops);
         ChartInfo {
             chart_type: chart_type,
             difficulty: difficulty,
@@ -311,12 +345,8 @@ fn main() {
             notes: notes,
         }
     }).collect();
-    println!("charts:\n{:?}", charts);
+    //println!("charts:\n{:?}", charts);
 
-
-    // fill end of freeze arrow
-    
-    //charts.iter_mut().map(|chart| {
-    //    let mut notes = chart.notes;
-    //});
+    let j = serde_json::to_string(&charts[0]).unwrap();
+    println!("{}", j); 
 }
