@@ -12,6 +12,7 @@ static NOTE_UNIT: i32 = 192;
 
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 enum Color {
     Red,
     Blue,
@@ -32,6 +33,7 @@ fn ofs_to_color(ofs: i32) -> Color {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 enum Direction {
     Up,
     Down,
@@ -50,6 +52,7 @@ fn int_to_direction(i: i32) -> Direction {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 enum ArrowType {
     None, 
     Normal,
@@ -77,7 +80,7 @@ struct Arrow {
     direction: Direction,
     arrow_type: ArrowType,
     end: i32,
-    //end_time: f32
+    end_time: f32
 }
 
 // "0012" -> [Arrow(Up, Normal), Arrow(Right, Freeze)]
@@ -93,8 +96,8 @@ fn make_arrows(s: &str) -> Vec<Arrow> {
         arrows.push(Arrow {
             direction: int_to_direction(i as i32),
             arrow_type: arrow_type,
-            end: 0
-            //end_time: ofs + NOTE_UNIT / 4
+            end: 0,
+            end_time: 0.0
         });
         }
     }
@@ -217,7 +220,8 @@ fn str_to_notes(bars: Vec<&str>, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> Vec<Divi
             arrows.push(Arrow {
                 direction: arrow.direction,
                 arrow_type: arrow.arrow_type,
-                end: end
+                end: end,
+                end_time: offset_to_time(end, bpms, stops)
             });
         }
         // dont add if all arrows are freeze end
@@ -347,6 +351,6 @@ fn main() {
     }).collect();
     //println!("charts:\n{:?}", charts);
 
-    let j = serde_json::to_string(&charts[0]).unwrap();
+    let j = serde_json::to_string(&charts[0].notes).unwrap();
     println!("{}", j); 
 }
