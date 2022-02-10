@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::path::Path;
 use std::collections::HashMap;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
@@ -301,10 +302,24 @@ fn offset_to_time(offset: i32, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> f32 {
     time
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let filename = &args[1];
-    let contents = fs::read_to_string(filename)
+#[derive(Debug, Deserialize, Serialize)]
+struct Music {
+    path: String,
+    offset: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Song {
+    title: String,
+    dir_name: String,
+    charts: Vec<ChartInfo>,
+    bpm: f32,
+    music: Music
+}
+
+fn sm_to_json(dirname: String, filepath: String) -> Song {
+    println!("{}/{}", dirname, filepath);
+    let contents = fs::read_to_string(filepath)
     .expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents.split("\n").filter(|s| !s.starts_with("//")).map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
@@ -329,7 +344,12 @@ fn main() {
     //println!("file content:\n{:?}", props);
 
     let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
-    let stops: Vec<Stop> = props.get("STOPS").unwrap().split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect();
+    let stop_str = props.get("STOPS").unwrap();
+    let stops: Vec<Stop> = if stop_str == "" {
+        Vec::new()
+    } else {
+        stop_str.split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect()
+    };
     //println!("BPM:\n{:?}", bpms);
     //println!("stop:\n{:?}", stops);
 
@@ -351,6 +371,70 @@ fn main() {
     }).collect();
     //println!("charts:\n{:?}", charts);
 
-    let j = serde_json::to_string(&charts[0].notes).unwrap();
-    println!("{}", j); 
+
+    //let split: Vec<&str> = props.get("DISPLAYBPM").unwrap().split(":").collect();
+    let displaybpm: f32 = match props.get("DISPLAYBPM") {
+        Some(s) => get_max_disp_bpm(s),
+        None => match bpms.iter().max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()) {
+            Some(bpm) => bpm.bpm,
+            None => unreachable!(),
+        }
+    };
+    return Song {
+        title: props.get("TITLE").unwrap().to_string(),
+        dir_name: dirname,
+        charts: charts,
+        bpm: displaybpm,
+        music: Music {
+            path: props.get("MUSIC").unwrap().to_string(),
+            offset: props.get("OFFSET").unwrap().parse().unwrap(),
+        }
+    };
+}
+
+fn get_max_disp_bpm(s: &str) -> f32 {
+    let split: Vec<&str> = s.split(":").collect();
+    return split[1].parse().unwrap();
+}
+
+// todo: 1つの.smファイルを1つのjsonにしたほうが楽そう
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    match fs::read_dir(args[1].clone()) {
+        Ok(dirs) => {
+            let mut songs = Vec::new();
+            for dir in dirs {
+                let dir = dir.unwrap();
+                let dirname = dir.file_name().into_string().unwrap();
+                let mut files = Vec::new();
+                match fs::read_dir(dir.path()) {
+                    Ok(dirs) => {
+                        for file in dirs {
+                            let file = file.unwrap();
+                            let filename = file.file_name().into_string().unwrap();
+                            if filename.ends_with(".sm") {
+                                let path = Path::new(&dir.path()).join(filename);
+                                files.push(path.to_str().unwrap().to_string());
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        println!("{:?}", e);
+                    }
+                }
+                for file in files {
+                    let song = sm_to_json(dirname.clone(), file.clone());
+                    songs.push(song);
+                }
+            }
+            let j = serde_json::to_string(&songs).unwrap();
+            println!("{}", j);
+        },
+        Err(e) => {
+            println!("{:?}", e);
+        }
+    }
+    //let filename = &args[1];
+    //let song = sm_to_json("".to_string(), filename.to_string());
+    //let j = serde_json::to_string(&song).unwrap();
 }
