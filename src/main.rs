@@ -129,7 +129,6 @@ fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
                 color: color,
                 offset: offset + ofs_in_bar,
                 time: 0.0
-                //time: offset + NOTE_UNIT / 4
             });
         }
     }
@@ -182,8 +181,20 @@ struct ChartInfo {
     difficulty: Difficulty,
     level: i32,
     groove_radar: Vec<i32>,
-    //notes: Vec<String>
-    notes: Vec<Division>,
+    //notes: Vec<Division>,
+}
+
+struct Chart {
+    info: ChartInfo,
+    //notes: Vec<Division>,
+    content: LegacyChartContent,
+}
+
+// TODO: viewerと同時に変更する
+#[derive(Debug, Deserialize, Serialize)]
+struct LegacyChartContent {
+    stream: Vec<Division>,
+    stream_info: Vec<i32>,
 }
 
 fn find_freeze_end(notes: &Vec<Division>, offset: i32, direction: Direction) -> i32 {
@@ -317,8 +328,61 @@ struct Song {
     music: Music
 }
 
-fn sm_to_json(dirname: String, filepath: String) -> Song {
-    println!("{}/{}", dirname, filepath);
+fn sm_to_chart(filepath: String) -> Vec<Chart> {
+    let contents = fs::read_to_string(filepath)
+    .expect("file open error");
+    // remove comment
+    let statements_without_comment: Vec<&str> = contents.split("\n").filter(|s| !s.starts_with("//")).map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let contents_without_comment: String = statements_without_comment.join("\n");
+    let statements = contents_without_comment.split(";");
+    let mut props = HashMap::new();
+    let mut notes_strings = Vec::new();
+    for statement in statements {
+        let parts: Vec<&str> = statement.trim().split(":").collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let key = parts[0].trim_matches('#');
+        let value = parts[1..].join(":");
+        if key == "NOTES" {
+            notes_strings.push(value.to_string());
+        } else {
+            props.insert(key.to_string(), value.to_string());
+        }
+    }
+    let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
+    let stop_str = props.get("STOPS").unwrap();
+    let stops: Vec<Stop> = if stop_str == "" {
+        Vec::new()
+    } else {
+        stop_str.split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect()
+    };
+    let notes_content : Vec<Vec<&str>> = notes_strings.iter().map(|s| s.split(":").collect()).collect();
+
+    return notes_content.iter().map(|s| {
+        let chart_type = ChartType::from_str(s[0].trim_start()).unwrap();
+        let difficulty = Difficulty::from_str(s[2].trim_start()).unwrap();
+        let level = s[3].trim_start().parse().unwrap();
+        let groove_radar = s[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect();
+        let info = ChartInfo {
+            chart_type: chart_type,
+            difficulty: difficulty,
+            level: level,
+            groove_radar: groove_radar,
+            //notes: notes,
+        };
+        let notes = str_to_notes(s[5].split(",").map(|s| s.trim_start()).collect(), &bpms, &stops);
+        Chart {
+            info: info,
+            content: LegacyChartContent {
+                stream: notes,
+                stream_info: Vec::new(),
+            }
+        }
+    }).collect();
+}
+
+fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     let contents = fs::read_to_string(filepath)
     .expect("file open error");
     // remove comment
@@ -344,12 +408,6 @@ fn sm_to_json(dirname: String, filepath: String) -> Song {
     //println!("file content:\n{:?}", props);
 
     let bpms: Vec<BPM> = props.get("BPMS").unwrap().split(",").map(|s| BPM::from_str(s.trim_end()).unwrap()).collect();
-    let stop_str = props.get("STOPS").unwrap();
-    let stops: Vec<Stop> = if stop_str == "" {
-        Vec::new()
-    } else {
-        stop_str.split(",").map(|s| Stop::from_str(s.trim_end()).unwrap()).collect()
-    };
     //println!("BPM:\n{:?}", bpms);
     //println!("stop:\n{:?}", stops);
 
@@ -360,13 +418,12 @@ fn sm_to_json(dirname: String, filepath: String) -> Song {
         let difficulty = Difficulty::from_str(s[2].trim_start()).unwrap();
         let level = s[3].trim_start().parse().unwrap();
         let groove_radar = s[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect();
-        let notes = str_to_notes(s[5].split(",").map(|s| s.trim_start()).collect(), &bpms, &stops);
         ChartInfo {
             chart_type: chart_type,
             difficulty: difficulty,
             level: level,
             groove_radar: groove_radar,
-            notes: notes,
+            //notes: notes,
         }
     }).collect();
     //println!("charts:\n{:?}", charts);
@@ -423,8 +480,19 @@ fn main() {
                     }
                 }
                 for file in files {
-                    let song = sm_to_json(dirname.clone(), file.clone());
+                    let song = sm_to_song_info(dirname.clone(), file.clone());
+                    let dir_path = Path::new("output").join(&dir.path());
+                    fs::create_dir_all(&dir_path).unwrap();
+                    let charts = sm_to_chart(file.clone());
+                    for chart in &charts {
+                        let mut chart_path = dir_path.clone();
+                        chart_path.push(format!("{:?}.json", chart.info.difficulty));
+                        println!("{:?}", chart_path);
+                        let chart_json = serde_json::to_string(&chart.content).unwrap();
+                        fs::write(chart_path, chart_json).unwrap();
+                    }
                     songs.push(song);
+                    //let mut file = File::create(outdir)?;
                 }
             }
             let j = serde_json::to_string(&songs).unwrap();
@@ -434,7 +502,4 @@ fn main() {
             println!("{:?}", e);
         }
     }
-    //let filename = &args[1];
-    //let song = sm_to_json("".to_string(), filename.to_string());
-    //let j = serde_json::to_string(&song).unwrap();
 }
