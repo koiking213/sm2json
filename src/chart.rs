@@ -88,7 +88,7 @@ fn make_arrows(s: &str) -> Vec<Arrow> {
         if arrow_type != ArrowType::None {
             arrows.push(Arrow {
                 direction: int_to_direction(i as i32),
-                arrow_type: arrow_type,
+                arrow_type,
                 end: 0,
                 end_time: 0.0,
             });
@@ -117,8 +117,8 @@ fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
         let arrows = make_arrows(division);
         if !arrows.is_empty() {
             divisions.push(Division {
-                arrows: arrows,
-                color: color,
+                arrows,
+                color,
                 offset: offset + ofs_in_bar,
                 time: 0.0,
             });
@@ -226,14 +226,14 @@ fn str_to_notes(bars: Vec<&str>, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> Vec<Divi
             arrows.push(Arrow {
                 direction: arrow.direction,
                 arrow_type: arrow.arrow_type,
-                end: end,
+                end,
                 end_time: offset_to_time(end, bpms, stops),
             });
         }
         // dont add if all arrows are freeze end
         if arrows.iter().any(|x| x.arrow_type != ArrowType::FreezeEnd) {
             notes_with_freeze_end.push(Division {
-                arrows: arrows,
+                arrows,
                 color: div.color,
                 offset: div.offset,
                 time: offset_to_time(div.offset, bpms, stops),
@@ -254,10 +254,7 @@ impl FromStr for Stop {
         let mut s = s.split("=");
         let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let time = s.next().unwrap().parse::<f32>().unwrap();
-        Ok(Stop {
-            offset: offset,
-            time: time,
-        })
+        Ok(Stop { offset, time })
     }
 }
 
@@ -273,10 +270,7 @@ impl FromStr for BPM {
         let mut s = s.split("=");
         let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let bpm = s.next().unwrap().parse::<f32>().unwrap();
-        Ok(BPM {
-            offset: offset,
-            bpm: bpm,
-        })
+        Ok(BPM { offset, bpm })
     }
 }
 
@@ -366,11 +360,10 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
                 .map(|s| s.parse().unwrap())
                 .collect();
             let info = ChartInfo {
-                chart_type: chart_type,
-                difficulty: difficulty,
-                level: level,
-                groove_radar: groove_radar,
-                //notes: notes,
+                chart_type,
+                difficulty,
+                level,
+                groove_radar,
             };
             let notes = str_to_notes(
                 s[5].split(",").map(|s| s.trim_start()).collect(),
@@ -378,7 +371,7 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
                 &stops,
             );
             Chart {
-                info: info,
+                info,
                 content: LegacyChartContent {
                     stream: notes,
                     stream_info: Vec::new(),

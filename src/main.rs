@@ -79,11 +79,10 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
                 .map(|s| s.parse().unwrap())
                 .collect();
             chart::ChartInfo {
-                chart_type: chart_type,
-                difficulty: difficulty,
-                level: level,
-                groove_radar: groove_radar,
-                //notes: notes,
+                chart_type,
+                difficulty,
+                level,
+                groove_radar,
             }
         })
         .collect();
@@ -101,7 +100,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     return Song {
         title: props.get("TITLE").unwrap().to_string(),
         dir_name: dirname,
-        charts: charts,
+        charts,
         bpm: displaybpm,
         music: Music {
             path: props.get("MUSIC").unwrap().to_string(),
