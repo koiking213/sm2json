@@ -30,17 +30,17 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     let contents = fs::read_to_string(filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents
-        .split("\n")
+        .split('\n')
         .filter(|s| !s.starts_with("//"))
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();
     let contents_without_comment: String = statements_without_comment.join("\n");
-    let statements = contents_without_comment.split(";");
+    let statements = contents_without_comment.split(';');
     let mut props = HashMap::new();
     let mut notes_strings = Vec::new();
     for statement in statements {
-        let parts: Vec<&str> = statement.trim().split(":").collect();
+        let parts: Vec<&str> = statement.trim().split(':').collect();
         if parts.len() < 2 {
             continue;
         }
@@ -57,13 +57,13 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     let bpms: Vec<chart::BPM> = props
         .get("BPMS")
         .unwrap()
-        .split(",")
+        .split(',')
         .map(|s| chart::BPM::from_str(s.trim_end()).unwrap())
         .collect();
 
     let notes_content: Vec<Vec<&str>> = notes_strings
         .iter()
-        .map(|s| s.split(":").collect())
+        .map(|s| s.split(':').collect())
         .collect();
 
     // TODO: chart側でコンストラクタを用意する
@@ -75,7 +75,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
             let level = s[3].trim_start().parse().unwrap();
             let groove_radar = s[4]
                 .trim_start()
-                .split(",")
+                .split(',')
                 .map(|s| s.parse().unwrap())
                 .collect();
             chart::ChartInfo {
@@ -110,7 +110,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
 }
 
 fn get_max_disp_bpm(s: &str) -> f32 {
-    let split: Vec<&str> = s.split(":").collect();
+    let split: Vec<&str> = s.split(':').collect();
     return split[1].parse().unwrap();
 }
 

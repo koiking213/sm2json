@@ -190,7 +190,7 @@ pub struct LegacyChartContent {
     stream_info: Vec<i32>,
 }
 
-fn find_freeze_end(notes: &Vec<Division>, offset: i32, direction: Direction) -> i32 {
+fn find_freeze_end(notes: &[Division], offset: i32, direction: Direction) -> i32 {
     for division in notes {
         if division.offset <= offset {
             continue;
@@ -204,12 +204,12 @@ fn find_freeze_end(notes: &Vec<Division>, offset: i32, direction: Direction) -> 
     panic!("no freeze end found");
 }
 
-fn str_to_notes(bars: Vec<&str>, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> Vec<Division> {
+fn str_to_notes(bars: Vec<&str>, bpms: &[BPM], stops: &[Stop]) -> Vec<Division> {
     let mut notes: Vec<Division> = Vec::new();
     let mut offset = 0;
     for bar in bars {
         let divisions =
-            bar_to_divisions(bar.split("\n").filter(|&x| !x.is_empty()).collect(), offset);
+            bar_to_divisions(bar.split('\n').filter(|&x| !x.is_empty()).collect(), offset);
         notes.extend(divisions);
         offset += NOTE_UNIT;
     }
@@ -251,7 +251,7 @@ struct Stop {
 impl FromStr for Stop {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.split("=");
+        let mut s = s.split('=');
         let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let time = s.next().unwrap().parse::<f32>().unwrap();
         Ok(Stop { offset, time })
@@ -267,14 +267,14 @@ pub struct BPM {
 impl FromStr for BPM {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.split("=");
+        let mut s = s.split('=');
         let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let bpm = s.next().unwrap().parse::<f32>().unwrap();
         Ok(BPM { offset, bpm })
     }
 }
 
-fn offset_to_time(offset: i32, bpms: &Vec<BPM>, stops: &Vec<Stop>) -> f32 {
+fn offset_to_time(offset: i32, bpms: &[BPM], stops: &[Stop]) -> f32 {
     let mut time = 0.0;
     let mut done = 0;
     let mut prev_bpm = &bpms[0];
@@ -306,17 +306,17 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
     let contents = fs::read_to_string(filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents
-        .split("\n")
+        .split('\n')
         .filter(|s| !s.starts_with("//"))
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();
     let contents_without_comment: String = statements_without_comment.join("\n");
-    let statements = contents_without_comment.split(";");
+    let statements = contents_without_comment.split(';');
     let mut props = HashMap::new();
     let mut notes_strings = Vec::new();
     for statement in statements {
-        let parts: Vec<&str> = statement.trim().split(":").collect();
+        let parts: Vec<&str> = statement.trim().split(':').collect();
         if parts.len() < 2 {
             continue;
         }
@@ -331,7 +331,7 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
     let bpms: Vec<BPM> = props
         .get("BPMS")
         .unwrap()
-        .split(",")
+        .split(',')
         .map(|s| BPM::from_str(s.trim_end()).unwrap())
         .collect();
     let stop_str = props.get("STOPS").unwrap();
@@ -339,13 +339,13 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
         Vec::new()
     } else {
         stop_str
-            .split(",")
+            .split(',')
             .map(|s| Stop::from_str(s.trim_end()).unwrap())
             .collect()
     };
     let notes_content: Vec<Vec<&str>> = notes_strings
         .iter()
-        .map(|s| s.split(":").collect())
+        .map(|s| s.split(':').collect())
         .collect();
 
     return notes_content
@@ -356,7 +356,7 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
             let level = s[3].trim_start().parse().unwrap();
             let groove_radar = s[4]
                 .trim_start()
-                .split(",")
+                .split(',')
                 .map(|s| s.parse().unwrap())
                 .collect();
             let info = ChartInfo {
@@ -366,7 +366,7 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
                 groove_radar,
             };
             let notes = str_to_notes(
-                s[5].split(",").map(|s| s.trim_start()).collect(),
+                s[5].split(',').map(|s| s.trim_start()).collect(),
                 &bpms,
                 &stops,
             );
