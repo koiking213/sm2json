@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::collections::HashMap;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
 
 mod chart;
 
@@ -23,14 +23,18 @@ struct Song {
     dir_name: String,
     charts: Vec<chart::ChartInfo>,
     bpm: f32,
-    music: Music
+    music: Music,
 }
 
 fn sm_to_song_info(dirname: String, filepath: String) -> Song {
-    let contents = fs::read_to_string(filepath)
-    .expect("file open error");
+    let contents = fs::read_to_string(filepath).expect("file open error");
     // remove comment
-    let statements_without_comment: Vec<&str> = contents.split("\n").filter(|s| !s.starts_with("//")).map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let statements_without_comment: Vec<&str> = contents
+        .split("\n")
+        .filter(|s| !s.starts_with("//"))
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
     let contents_without_comment: String = statements_without_comment.join("\n");
     let statements = contents_without_comment.split(";");
     let mut props = HashMap::new();
@@ -50,31 +54,49 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     }
 
     // TODO: .ssc形式に対応するなら、BPM情報はChartInfoに含まれるべき
-    let bpms: Vec<chart::BPM> = props.get("BPMS").unwrap().split(",").map(|s| chart::BPM::from_str(s.trim_end()).unwrap()).collect();
+    let bpms: Vec<chart::BPM> = props
+        .get("BPMS")
+        .unwrap()
+        .split(",")
+        .map(|s| chart::BPM::from_str(s.trim_end()).unwrap())
+        .collect();
 
-    let notes_content : Vec<Vec<&str>> = notes_strings.iter().map(|s| s.split(":").collect()).collect();
+    let notes_content: Vec<Vec<&str>> = notes_strings
+        .iter()
+        .map(|s| s.split(":").collect())
+        .collect();
 
     // TODO: chart側でコンストラクタを用意する
-    let charts : Vec<chart::ChartInfo> = notes_content.iter().map(|s| {
-        let chart_type = chart::ChartType::from_str(s[0].trim_start()).unwrap();
-        let difficulty = chart::Difficulty::from_str(s[2].trim_start()).unwrap();
-        let level = s[3].trim_start().parse().unwrap();
-        let groove_radar = s[4].trim_start().split(",").map(|s| s.parse().unwrap()).collect();
-        chart::ChartInfo {
-            chart_type: chart_type,
-            difficulty: difficulty,
-            level: level,
-            groove_radar: groove_radar,
-            //notes: notes,
-        }
-    }).collect();
+    let charts: Vec<chart::ChartInfo> = notes_content
+        .iter()
+        .map(|s| {
+            let chart_type = chart::ChartType::from_str(s[0].trim_start()).unwrap();
+            let difficulty = chart::Difficulty::from_str(s[2].trim_start()).unwrap();
+            let level = s[3].trim_start().parse().unwrap();
+            let groove_radar = s[4]
+                .trim_start()
+                .split(",")
+                .map(|s| s.parse().unwrap())
+                .collect();
+            chart::ChartInfo {
+                chart_type: chart_type,
+                difficulty: difficulty,
+                level: level,
+                groove_radar: groove_radar,
+                //notes: notes,
+            }
+        })
+        .collect();
 
     let displaybpm: f32 = match props.get("DISPLAYBPM") {
         Some(s) => get_max_disp_bpm(s),
-        None => match bpms.iter().max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()) {
+        None => match bpms
+            .iter()
+            .max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap())
+        {
             Some(bpm) => bpm.bpm,
             None => unreachable!(),
-        }
+        },
     };
     return Song {
         title: props.get("TITLE").unwrap().to_string(),
@@ -84,7 +106,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
         music: Music {
             path: props.get("MUSIC").unwrap().to_string(),
             offset: props.get("OFFSET").unwrap().parse().unwrap(),
-        }
+        },
     };
 }
 
@@ -113,7 +135,7 @@ fn main() {
                                 files.push(path.to_str().unwrap().to_string());
                             }
                         }
-                    },
+                    }
                     Err(e) => {
                         println!("{:?}", e);
                     }
@@ -136,7 +158,7 @@ fn main() {
             }
             let j = serde_json::to_string(&songs).unwrap();
             println!("{}", j);
-        },
+        }
         Err(e) => {
             println!("{:?}", e);
         }
