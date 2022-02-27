@@ -54,11 +54,11 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     }
 
     // TODO: .ssc形式に対応するなら、BPM情報はChartInfoに含まれるべき
-    let bpms: Vec<chart::BPM> = props
+    let bpms: Vec<chart::Bpm> = props
         .get("BPMS")
         .unwrap()
         .split(',')
-        .map(|s| chart::BPM::from_str(s.trim_end()).unwrap())
+        .map(|s| chart::Bpm::from_str(s.trim_end()).unwrap())
         .collect();
 
     let notes_content: Vec<Vec<&str>> = notes_strings
@@ -111,7 +111,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
 
 fn get_max_disp_bpm(s: &str) -> f32 {
     let split: Vec<&str> = s.split(':').collect();
-    return split[1].parse().unwrap();
+    split[1].parse().unwrap()
 }
 
 // TODO: 1つの.smファイルを1つのjsonにしたほうが楽そう

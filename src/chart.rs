@@ -204,7 +204,7 @@ fn find_freeze_end(notes: &[Division], offset: i32, direction: Direction) -> i32
     panic!("no freeze end found");
 }
 
-fn str_to_notes(bars: Vec<&str>, bpms: &[BPM], stops: &[Stop]) -> Vec<Division> {
+fn str_to_notes(bars: Vec<&str>, bpms: &[Bpm], stops: &[Stop]) -> Vec<Division> {
     let mut notes: Vec<Division> = Vec::new();
     let mut offset = 0;
     for bar in bars {
@@ -260,21 +260,21 @@ impl FromStr for Stop {
 
 // TODO: bpmの公開をやめてmaxを提供する
 #[derive(Debug, Deserialize, Serialize)]
-pub struct BPM {
+pub struct Bpm {
     offset: f32,
     pub bpm: f32,
 }
-impl FromStr for BPM {
+impl FromStr for Bpm {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut s = s.split('=');
         let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
         let bpm = s.next().unwrap().parse::<f32>().unwrap();
-        Ok(BPM { offset, bpm })
+        Ok(Bpm { offset, bpm })
     }
 }
 
-fn offset_to_time(offset: i32, bpms: &[BPM], stops: &[Stop]) -> f32 {
+fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
     let mut time = 0.0;
     let mut done = 0;
     let mut prev_bpm = &bpms[0];
@@ -328,14 +328,14 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
             props.insert(key.to_string(), value.to_string());
         }
     }
-    let bpms: Vec<BPM> = props
+    let bpms: Vec<Bpm> = props
         .get("BPMS")
         .unwrap()
         .split(',')
-        .map(|s| BPM::from_str(s.trim_end()).unwrap())
+        .map(|s| Bpm::from_str(s.trim_end()).unwrap())
         .collect();
     let stop_str = props.get("STOPS").unwrap();
-    let stops: Vec<Stop> = if stop_str == "" {
+    let stops: Vec<Stop> = if stop_str.is_empty() {
         Vec::new()
     } else {
         stop_str
