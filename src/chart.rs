@@ -2,6 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
+
+#[path = "arrow.rs"]
+mod arrow;
+use arrow::{Arrow, make_arrows, Direction, ArrowType};
+
 const NOTE_UNIT: i32 = 192;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -25,98 +30,6 @@ fn ofs_to_color(ofs: i32) -> Color {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
-fn int_to_direction(i: i32) -> Direction {
-    match i {
-        0 => Direction::Left,
-        1 => Direction::Down,
-        2 => Direction::Up,
-        3 => Direction::Right,
-        _ => panic!("invalid direction"),
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum ArrowType {
-    None,
-    Normal,
-    Freeze,
-    FreezeEnd,
-    Mine,
-}
-
-impl FromStr for ArrowType {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "0" => Ok(ArrowType::None),
-            "1" => Ok(ArrowType::Normal),
-            "2" => Ok(ArrowType::Freeze),
-            "3" => Ok(ArrowType::FreezeEnd),
-            "M" => Ok(ArrowType::Mine),
-            _ => Err(format!("{} is not arrow type", s)),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
-struct Arrow {
-    direction: Direction,
-    arrow_type: ArrowType,
-    end: i32,
-    end_time: f32,
-}
-
-// "0012" -> [Arrow(Up, Normal), Arrow(Right, Freeze)]
-fn make_arrows(s: &str) -> Vec<Arrow> {
-    let mut arrows: Vec<Arrow> = Vec::new();
-    if s.len() != 4 {
-        panic!("{} is not 4 length", s);
-    }
-    for (i, c) in s.chars().enumerate() {
-        //let ofs = i * (NOTE_UNIT / 4);
-        let arrow_type = ArrowType::from_str(&c.to_string()).unwrap();
-        if arrow_type != ArrowType::None {
-            arrows.push(Arrow {
-                direction: int_to_direction(i as i32),
-                arrow_type,
-                end: 0,
-                end_time: 0.0,
-            });
-        }
-    }
-    arrows
-}
-
-#[test]
-fn test_make_arrows() {
-    assert_eq!(
-        make_arrows("0012"),
-        vec![
-            Arrow {
-                direction: Direction::Up,
-                arrow_type: ArrowType::Normal,
-                end: 0,
-                end_time: 0.0,
-            },
-            Arrow {
-                direction: Direction::Right,
-                arrow_type: ArrowType::Freeze,
-                end: 0,
-                end_time: 0.0,
-            },
-        ]
-    );
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Division {
@@ -217,7 +130,7 @@ fn find_freeze_end(notes: &[Division], offset: i32, direction: Direction) -> i32
             continue;
         }
         for arrow in &division.arrows {
-            if arrow.direction == direction && arrow.arrow_type == ArrowType::FreezeEnd {
+            if arrow.is_freeze_end(direction) {
                 return division.offset;
             }
         }
