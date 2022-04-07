@@ -156,7 +156,7 @@ fn main() {
                 }
             }
             let j = serde_json::to_string(&songs).unwrap();
-            println!("{}", j);
+            fs::write(Path::new("output").join("songs.json"), j).unwrap();
         }
         Err(e) => {
             println!("{:?}", e);

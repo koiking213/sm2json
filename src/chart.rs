@@ -7,7 +7,7 @@ use std::str::FromStr;
 mod arrow;
 use arrow::{Arrow, make_arrows, Direction, ArrowType};
 
-const NOTE_UNIT: i32 = 192;
+pub const NOTE_UNIT: i32 = 192;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
