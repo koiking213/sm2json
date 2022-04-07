@@ -97,6 +97,27 @@ fn make_arrows(s: &str) -> Vec<Arrow> {
     arrows
 }
 
+#[test]
+fn test_make_arrows() {
+    assert_eq!(
+        make_arrows("0012"),
+        vec![
+            Arrow {
+                direction: Direction::Up,
+                arrow_type: ArrowType::Normal,
+                end: 0,
+                end_time: 0.0,
+            },
+            Arrow {
+                direction: Direction::Right,
+                arrow_type: ArrowType::Freeze,
+                end: 0,
+                end_time: 0.0,
+            },
+        ]
+    );
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Division {
     arrows: Vec<Arrow>,
