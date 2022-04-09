@@ -124,6 +124,7 @@ fn main() {
                 let dir = dir.unwrap();
                 let dirname = dir.file_name().into_string().unwrap();
                 let mut files = Vec::new();
+                // smファイルを探索
                 match fs::read_dir(dir.path()) {
                     Ok(dirs) => {
                         for file in dirs {
@@ -139,11 +140,13 @@ fn main() {
                         println!("{:?}", e);
                     }
                 }
+                // 各譜面のjsonを作りつつ曲リストに追加していく
                 for file in files {
                     let song = sm_to_song_info(dirname.clone(), file.clone());
                     let dir_path = Path::new("output").join(&dir.path());
                     fs::create_dir_all(&dir_path).unwrap();
-                    let charts = chart::sm_to_chart(file.clone());
+                    let (charts, gimmick) = chart::sm_to_chart(file.clone());
+                    // 譜面ごとのjsonを作成
                     for chart in &charts {
                         let mut chart_path = dir_path.clone();
                         chart_path.push(format!("{:?}.json", chart.info.difficulty));
@@ -151,8 +154,11 @@ fn main() {
                         let chart_json = serde_json::to_string(&chart.content).unwrap();
                         fs::write(chart_path, chart_json).unwrap();
                     }
+                    // 曲のギミック情報を作成 (TODO: .ssc対応時にはギミックは譜面ごとに作成する)
+                    fs::write(dir_path.join("gimmick.json"), serde_json::to_string(&gimmick).unwrap()).unwrap();
+
+                    // 曲リスト更新
                     songs.push(song);
-                    //let mut file = File::create(outdir)?;
                 }
             }
             let j = serde_json::to_string(&songs).unwrap();

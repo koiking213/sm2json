@@ -178,7 +178,7 @@ fn str_to_notes(bars: Vec<&str>, bpms: &[Bpm], stops: &[Stop]) -> Vec<Division> 
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Stop {
+pub struct Stop {
     offset: f32,
     time: f32,
 }
@@ -208,6 +208,42 @@ impl FromStr for Bpm {
     }
 }
 
+// TODO: viewer側でdivisionではなくoffsetを取るようにする
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BpmDisplay {
+    pub division: f32,
+    pub bpm: f32,
+}
+impl BpmDisplay {
+    fn from_bpm(bpm: Bpm) -> Self {
+        BpmDisplay {
+            division: bpm.offset / NOTE_UNIT as f32,
+            bpm: bpm.bpm,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct StopDisplay {
+    pub division: f32,
+    pub time: f32,
+}
+impl StopDisplay {
+    fn from_stop(stop: Stop) -> Self {
+        StopDisplay {
+            division: stop.offset / NOTE_UNIT as f32,
+            time: stop.time,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Gimmick {
+    soflan: Vec<BpmDisplay>,
+    stop: Vec<StopDisplay>,
+}
+
+
 fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
     let mut time = 0.0;
     let mut done = 0;
@@ -236,7 +272,7 @@ fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
     time
 }
 
-pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
+pub fn sm_to_chart(filepath: String) -> (Vec<Chart>, Gimmick) {
     let contents = fs::read_to_string(filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents
@@ -282,7 +318,8 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
         .map(|s| s.split(':').collect())
         .collect();
 
-    return notes_content
+    return (
+        notes_content
         .iter()
         .map(|s| {
             let chart_type = ChartType::from_str(s[0].trim_start()).unwrap();
@@ -312,5 +349,10 @@ pub fn sm_to_chart(filepath: String) -> Vec<Chart> {
                 },
             }
         })
-        .collect();
+        .collect(),
+        Gimmick {
+            soflan: bpms.into_iter().map(BpmDisplay::from_bpm).collect(),
+            stop: stops.into_iter().map(StopDisplay::from_stop).collect(),
+        }
+    );
 }
