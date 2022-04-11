@@ -4,8 +4,10 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
-
-mod chart;
+pub mod arrow;
+pub mod gimmick;
+pub mod chart;
+pub mod groove_radar;
 
 // bar: 4分が4つ入る単位
 // division: barを192分割して矢印があるところ
@@ -26,8 +28,9 @@ struct Song {
     music: Music,
 }
 
+// TODO: chartは外部から受け取る
 fn sm_to_song_info(dirname: String, filepath: String) -> Song {
-    let contents = fs::read_to_string(filepath).expect("file open error");
+    let contents = fs::read_to_string(&filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents
         .split('\n')
@@ -54,38 +57,14 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     }
 
     // TODO: .ssc形式に対応するなら、BPM情報はChartInfoに含まれるべき
-    let bpms: Vec<chart::Bpm> = props
+    let bpms: Vec<gimmick::Bpm> = props
         .get("BPMS")
         .unwrap()
         .split(',')
-        .map(|s| chart::Bpm::from_str(s.trim_end()).unwrap())
+        .map(|s| gimmick::Bpm::from_str(s.trim_end()).unwrap())
         .collect();
 
-    let notes_content: Vec<Vec<&str>> = notes_strings
-        .iter()
-        .map(|s| s.split(':').collect())
-        .collect();
-
-    // TODO: chart側でコンストラクタを用意する
-    let charts: Vec<chart::ChartInfo> = notes_content
-        .iter()
-        .map(|s| {
-            let chart_type = chart::ChartType::from_str(s[0].trim_start()).unwrap();
-            let difficulty = chart::Difficulty::from_str(s[2].trim_start()).unwrap();
-            let level = s[3].trim_start().parse().unwrap();
-            let groove_radar = s[4]
-                .trim_start()
-                .split(',')
-                .map(|s| s.parse().unwrap())
-                .collect();
-            chart::ChartInfo {
-                chart_type,
-                difficulty,
-                level,
-                groove_radar,
-            }
-        })
-        .collect();
+    let (charts, _) = chart::sm_to_chart(filepath);
 
     let displaybpm: f32 = match props.get("DISPLAYBPM") {
         Some(s) => get_max_disp_bpm(s),
@@ -100,7 +79,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
     return Song {
         title: props.get("TITLE").unwrap().to_string(),
         dir_name: dirname,
-        charts,
+        charts: charts.iter().map(|chart| chart.info).collect(),
         bpm: displaybpm,
         music: Music {
             path: props.get("MUSIC").unwrap().to_string(),

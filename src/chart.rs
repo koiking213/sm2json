@@ -3,65 +3,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
 
-#[path = "arrow.rs"]
-mod arrow;
-use arrow::{Arrow, make_arrows, Direction, ArrowType};
 
-pub const NOTE_UNIT: i32 = 192;
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum Color {
-    Red,
-    Blue,
-    Yellow,
-    Green,
-}
-
-fn ofs_to_color(ofs: i32) -> Color {
-    if ofs % (NOTE_UNIT / 4) == 0 {
-        Color::Red
-    } else if ofs % (NOTE_UNIT / 8) == 0 {
-        Color::Blue
-    } else if ofs % (NOTE_UNIT / 16) == 0 {
-        Color::Yellow
-    } else {
-        Color::Green
-    }
-}
+use crate::arrow::{Arrow, ArrowType, Division, NOTE_UNIT, bar_to_divisions, find_freeze_end};
+use crate::gimmick::{Gimmick, Bpm, Stop, BpmDisplay, StopDisplay};
+use crate::groove_radar::{GrooveRadar, get_groove_radar};
 
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct Division {
-    arrows: Vec<Arrow>,
-    color: Color,
-    offset: i32,
-    time: f32,
-}
-
-fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
-    let mut divisions: Vec<Division> = Vec::new();
-    if NOTE_UNIT % (bar.len() as i32) != 0 {
-        panic!("{:?} is not a valid var", bar);
-    }
-    let epsilon = NOTE_UNIT / (bar.len() as i32);
-    for (i, division) in bar.iter().enumerate() {
-        let ofs_in_bar = i as i32 * epsilon;
-        let color = ofs_to_color(ofs_in_bar);
-        let arrows = make_arrows(division);
-        if !arrows.is_empty() {
-            divisions.push(Division {
-                arrows,
-                color,
-                offset: offset + ofs_in_bar,
-                time: 0.0,
-            });
-        }
-    }
-    divisions
-}
-
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum ChartType {
     DanceSingle,
     DanceDouble,
@@ -78,7 +26,7 @@ impl FromStr for ChartType {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum Difficulty {
     Easy,
     Medium,
@@ -101,12 +49,12 @@ impl FromStr for Difficulty {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct ChartInfo {
     pub chart_type: ChartType,
     pub difficulty: Difficulty,
     pub level: i32,
-    pub groove_radar: Vec<i32>,
+    pub groove_radar: GrooveRadar,
     //notes: Vec<Division>,
 }
 
@@ -122,20 +70,6 @@ pub struct Chart {
 pub struct LegacyChartContent {
     stream: Vec<Division>,
     stream_info: Vec<i32>,
-}
-
-fn find_freeze_end(notes: &[Division], offset: i32, direction: Direction) -> i32 {
-    for division in notes {
-        if division.offset <= offset {
-            continue;
-        }
-        for arrow in &division.arrows {
-            if arrow.is_freeze_end(direction) {
-                return division.offset;
-            }
-        }
-    }
-    panic!("no freeze end found");
 }
 
 fn str_to_notes(bars: Vec<&str>, bpms: &[Bpm], stops: &[Stop]) -> Vec<Division> {
@@ -177,94 +111,28 @@ fn str_to_notes(bars: Vec<&str>, bpms: &[Bpm], stops: &[Stop]) -> Vec<Division> 
     notes_with_freeze_end
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Stop {
-    offset: f32,
-    time: f32,
-}
-impl FromStr for Stop {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.split('=');
-        let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
-        let time = s.next().unwrap().parse::<f32>().unwrap();
-        Ok(Stop { offset, time })
-    }
-}
 
-// TODO: bpmの公開をやめてmaxを提供する
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Bpm {
-    offset: f32,
-    pub bpm: f32,
-}
-impl FromStr for Bpm {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.split('=');
-        let offset = s.next().unwrap().parse::<f32>().unwrap() * (NOTE_UNIT / 4) as f32;
-        let bpm = s.next().unwrap().parse::<f32>().unwrap();
-        Ok(Bpm { offset, bpm })
-    }
-}
-
-// TODO: viewer側でdivisionではなくoffsetを取るようにする
-#[derive(Debug, Deserialize, Serialize)]
-pub struct BpmDisplay {
-    pub division: f32,
-    pub bpm: f32,
-}
-impl BpmDisplay {
-    fn from_bpm(bpm: Bpm) -> Self {
-        BpmDisplay {
-            division: bpm.offset / NOTE_UNIT as f32,
-            bpm: bpm.bpm,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct StopDisplay {
-    pub division: f32,
-    pub time: f32,
-}
-impl StopDisplay {
-    fn from_stop(stop: Stop) -> Self {
-        StopDisplay {
-            division: stop.offset / NOTE_UNIT as f32,
-            time: stop.time,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Gimmick {
-    soflan: Vec<BpmDisplay>,
-    stop: Vec<StopDisplay>,
-}
-
-
-fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
+pub fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
     let mut time = 0.0;
     let mut done = 0;
     let mut prev_bpm = &bpms[0];
     for bpm in bpms {
-        if bpm.offset >= offset as f32 {
+        if bpm.offset >= offset {
             let elapsed = (offset - done) as f32 / ((NOTE_UNIT / 4) as f32);
             time += 60.0 / prev_bpm.bpm * elapsed;
             break;
         }
-        let elapsed = (bpm.offset - done as f32) / ((NOTE_UNIT / 4) as f32);
+        let elapsed = ((bpm.offset - done) as f32) / ((NOTE_UNIT / 4) as f32);
         time += 60.0 / prev_bpm.bpm * elapsed;
         done = bpm.offset as i32;
         prev_bpm = bpm;
     }
-    if bpms[bpms.len() - 1].offset < offset as f32 {
+    if bpms[bpms.len() - 1].offset < offset {
         let elapsed = (offset - done) as f32 / ((NOTE_UNIT / 4) as f32);
         time += 60.0 / bpms[bpms.len() - 1].bpm * elapsed;
     }
     for stop in stops {
-        if stop.offset >= offset as f32 {
+        if stop.offset >= offset {
             break;
         }
         time += stop.time;
@@ -325,22 +193,18 @@ pub fn sm_to_chart(filepath: String) -> (Vec<Chart>, Gimmick) {
             let chart_type = ChartType::from_str(s[0].trim_start()).unwrap();
             let difficulty = Difficulty::from_str(s[2].trim_start()).unwrap();
             let level = s[3].trim_start().parse().unwrap();
-            let groove_radar = s[4]
-                .trim_start()
-                .split(',')
-                .map(|s| s.parse().unwrap())
-                .collect();
+            let notes = str_to_notes(
+                s[5].split(',').map(|s| s.trim_start()).collect(),
+                &bpms,
+                &stops,
+            );
+            let groove_radar = get_groove_radar(&notes, &bpms, &stops);
             let info = ChartInfo {
                 chart_type,
                 difficulty,
                 level,
                 groove_radar,
             };
-            let notes = str_to_notes(
-                s[5].split(',').map(|s| s.trim_start()).collect(),
-                &bpms,
-                &stops,
-            );
             Chart {
                 info,
                 content: LegacyChartContent {

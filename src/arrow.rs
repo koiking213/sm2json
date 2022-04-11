@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+pub const NOTE_UNIT: i32 = 192;
+
 #[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Direction {
@@ -98,4 +100,70 @@ fn test_make_arrows() {
             },
         ]
     );
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Color {
+    Red,
+    Blue,
+    Yellow,
+    Green,
+}
+
+fn ofs_to_color(ofs: i32) -> Color {
+    if ofs % (NOTE_UNIT / 4) == 0 {
+        Color::Red
+    } else if ofs % (NOTE_UNIT / 8) == 0 {
+        Color::Blue
+    } else if ofs % (NOTE_UNIT / 16) == 0 {
+        Color::Yellow
+    } else {
+        Color::Green
+    }
+}
+
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Division {
+    pub arrows: Vec<Arrow>,
+    pub color: Color,
+    pub offset: i32,
+    pub time: f32,
+}
+
+pub fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
+    let mut divisions: Vec<Division> = Vec::new();
+    if NOTE_UNIT % (bar.len() as i32) != 0 {
+        panic!("{:?} is not a valid var", bar);
+    }
+    let epsilon = NOTE_UNIT / (bar.len() as i32);
+    for (i, division) in bar.iter().enumerate() {
+        let ofs_in_bar = i as i32 * epsilon;
+        let color = ofs_to_color(ofs_in_bar);
+        let arrows = make_arrows(division);
+        if !arrows.is_empty() {
+            divisions.push(Division {
+                arrows,
+                color,
+                offset: offset + ofs_in_bar,
+                time: 0.0,
+            });
+        }
+    }
+    divisions
+}
+
+pub fn find_freeze_end(notes: &[Division], offset: i32, direction: Direction) -> i32 {
+    for division in notes {
+        if division.offset <= offset {
+            continue;
+        }
+        for arrow in &division.arrows {
+            if arrow.is_freeze_end(direction) {
+                return division.offset;
+            }
+        }
+    }
+    panic!("no freeze end found");
 }
