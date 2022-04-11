@@ -81,7 +81,6 @@ fn calc_average_bpm(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
 fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     let max_density = calc_max_note_density(notes, bpms);
     let average_bpm = calc_average_bpm(notes, bpms, stops);
-    println!("{} {}", max_density, average_bpm);
     let max_density_per_min = (max_density as f32) * average_bpm / 4.0;
     if max_density_per_min < 600.0 {
         return (max_density_per_min / 6.0) as i32;
@@ -92,7 +91,15 @@ fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
 }
 
 fn calc_air(notes: &[Division]) -> i32{
-0
+    let jumps = notes.iter().filter(|d| d.is_jump()).count();
+    let shocks = notes.iter().filter(|d| d.is_shock()).count();
+    let music_length = notes.last().unwrap().time;
+    let jump_per_min = ((jumps + shocks) as f32 / music_length) * 60.0;
+    return if jump_per_min < 55.0 {
+        (jump_per_min * 20.0 / 11.0) as i32
+    } else {
+        ((jump_per_min - 1.0) * 50.0 / 27.0) as i32
+    }
 }
 
 fn calc_freeze(notes: &[Division]) -> i32{

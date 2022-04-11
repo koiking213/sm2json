@@ -132,6 +132,15 @@ pub struct Division {
     pub time: f32,
 }
 
+impl Division {
+    pub fn is_jump (&self) -> bool {
+    self.arrows.iter().filter(|a| a.arrow_type == ArrowType::Freeze || a.arrow_type == ArrowType::Normal).count() == 2
+    }
+    pub fn is_shock (&self) -> bool {
+        self.arrows.iter().any(|a| a.arrow_type == ArrowType::Mine)
+    }
+}
+
 pub fn bar_to_divisions(bar: Vec<&str>, offset: i32) -> Vec<Division> {
     let mut divisions: Vec<Division> = Vec::new();
     if NOTE_UNIT % (bar.len() as i32) != 0 {
