@@ -58,6 +58,9 @@ impl Arrow {
     pub fn is_freeze_end(&self, direction: Direction) -> bool {
         self.arrow_type == ArrowType::FreezeEnd && self.direction == direction
     }
+    pub fn is_freeze(&self) -> bool {
+        self.arrow_type == ArrowType::Freeze
+    }
 }
 
 // "0012" -> [Arrow(Up, Normal), Arrow(Right, Freeze)]

@@ -6,6 +6,8 @@ use itertools::Itertools;
 use crate::gimmick::{Bpm, Stop};
 use crate::chart::{offset_to_time};
 
+// TODO: 曲の長さの定義を決める
+
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct GrooveRadar {
     pub stream : i32,
@@ -64,8 +66,7 @@ fn calc_stream(notes: &[Division]) -> i32 {
     }
 }
 
-fn calc_average_bpm(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
-    let music_length = notes.last().unwrap().time;
+fn calc_beat_count(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
     let end = Bpm {offset: notes.last().unwrap().offset, bpm:0.0};
     let bpms_with_end = bpms.iter().chain(std::iter::once(&end));
     let mut num_beats = 0.0;
@@ -75,7 +76,12 @@ fn calc_average_bpm(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
         let end = offset_to_time(next_bpm.offset, bpms, stops);
         num_beats += (end - start) * current_bpm.bpm;
     }
-    return num_beats / music_length;
+    return num_beats / 60.0;
+}
+
+fn calc_average_bpm(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
+    let music_length = notes.last().unwrap().time;
+    return calc_beat_count(notes, bpms, stops) * 60.0 / music_length;
 }
 
 fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
@@ -87,7 +93,6 @@ fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     } else {
         return ((max_density_per_min + 594.0) * 100.0 / 1194.0) as i32;
     }
-
 }
 
 fn calc_air(notes: &[Division]) -> i32{
@@ -102,8 +107,21 @@ fn calc_air(notes: &[Division]) -> i32{
     }
 }
 
-fn calc_freeze(notes: &[Division]) -> i32{
-0
+fn calc_freeze(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
+    let total_len: i32 = notes.iter().map(|d| {
+        // 良い書き方がありそう
+        let len = d.arrows.iter().filter(|a| a.is_freeze()).map(|a| a.end - d.offset).max();
+        match len {
+            Some(len) => len,
+            None => 0,
+        }
+    }).sum::<i32>() / (NOTE_UNIT/4);
+    let freeze_ratio = (10000 * total_len) as f32 / calc_beat_count(notes, bpms, stops);
+    return if freeze_ratio < 3500.0 {
+        (freeze_ratio / 35.0) as i32
+    } else {
+        ((freeze_ratio + 2484.0) * 100.0 / 5984.0) as i32
+    }
 }
 
 fn calc_chaos(notes: &[Division]) -> i32{
@@ -115,7 +133,7 @@ pub fn get_groove_radar(notes: &[Division], bpms:&[Bpm], stops: &[Stop]) -> Groo
         stream: calc_stream(notes),
         voltage: calc_voltage(notes, bpms, stops),
         air: calc_air(notes),
-        freeze: calc_freeze(notes),
+        freeze: calc_freeze(notes, bpms, stops),
         chaos: calc_chaos(notes),
     }
 }
