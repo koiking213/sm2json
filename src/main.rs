@@ -90,7 +90,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
 
 fn get_max_disp_bpm(s: &str) -> f32 {
     let split: Vec<&str> = s.split(':').collect();
-    split[1].parse().unwrap()
+    split.last().unwrap().parse().unwrap()
 }
 
 // TODO: 1つの.smファイルを1つのjsonにしたほうが楽そう
@@ -99,7 +99,7 @@ fn main() {
     match fs::read_dir(args[1].clone()) {
         Ok(dirs) => {
             let mut songs = Vec::new();
-            for dir in dirs {
+            for dir in dirs.into_iter().filter(|dir| dir.as_ref().unwrap().path().is_dir()) {
                 let dir = dir.unwrap();
                 let dirname = dir.file_name().into_string().unwrap();
                 let mut files = Vec::new();
@@ -116,7 +116,7 @@ fn main() {
                         }
                     }
                     Err(e) => {
-                        println!("{:?}", e);
+                        println!("failed to read_dir for {:?}: {:?}",dir, e);
                     }
                 }
                 // 各譜面のjsonを作りつつ曲リストに追加していく
@@ -144,7 +144,7 @@ fn main() {
             fs::write(Path::new("output").join("songs.json"), j).unwrap();
         }
         Err(e) => {
-            println!("{:?}", e);
+            println!("failed to open root directory: {:?}", e);
         }
     }
 }
