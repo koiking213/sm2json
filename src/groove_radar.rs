@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 const NOTE_UNIT: i32 = 192;
 
-use crate::arrow::Division;
+use crate::arrow::{Division, Color};
 use itertools::Itertools;
 use crate::gimmick::{Bpm, Stop};
 use crate::chart::{offset_to_time};
@@ -124,8 +124,76 @@ fn calc_freeze(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     }
 }
 
-fn calc_chaos(notes: &[Division]) -> i32{
-0
+fn color_weight(color: &Color) -> f32 { 
+    match color {
+        Color::Red => 0.0,
+        Color::Blue => 2.0,
+        Color::Yellow=> 4.0,
+        Color::Green => 5.0,
+    }
+}
+
+fn calc_chaos_base_value(notes: &[Division]) -> f32 {
+    let mut base_value = 0.0;
+    for (prev_note, current_note) in notes.iter().tuple_windows() {
+        let interval = current_note.offset - prev_note.offset;
+        base_value += (current_note.arrows.len() as f32) * color_weight(&current_note.color) * (NOTE_UNIT / 4 / interval) as f32;
+    }
+    return base_value;
+}
+
+fn calc_total_bpm_change(bpms: &[Bpm], stops: &[Stop]) -> f32 {
+    // 
+    #[derive(Debug)]
+    enum Kind {
+        Bpm,
+        Stop,
+    }
+    #[derive(Debug)]
+    struct BpmOrStop {
+        offset: i32,
+        value: f32,
+        kind: Kind,
+    }
+    let mut gimmicks: Vec<BpmOrStop> = Vec::new();
+    for stop in stops {
+        gimmicks.push(BpmOrStop {offset: stop.offset, value: stop.time, kind: Kind::Stop});
+    }
+    for bpm in bpms {
+        gimmicks.push(BpmOrStop {offset: bpm.offset, value: bpm.bpm, kind: Kind::Bpm});
+    }
+    // TODO: stopとbpmが同じタイミングで起きる場合はstopのみ考慮する
+    gimmicks.sort_by(|a,b| a.offset.cmp(&b.offset));
+    let mut total_bpm_change = 0.0;
+    let mut current_bpm = bpms[0].bpm;
+    for gimmick in gimmicks {
+        match gimmick.kind {
+            Kind::Bpm => {
+                total_bpm_change += (gimmick.value - current_bpm).abs();
+                current_bpm = gimmick.value;
+            },
+            Kind::Stop => {
+                total_bpm_change += current_bpm;
+            }
+        }
+    }
+    total_bpm_change
+}
+
+fn calc_chaos(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
+    let music_length = notes.last().unwrap().time;
+    let base_value = calc_chaos_base_value(notes);
+    let change_per_min = calc_total_bpm_change(bpms, stops) * 60.0 / music_length;
+    let change_correction = 1.0 + (change_per_min / 1500.0);
+
+    let chaos_degree = base_value * change_correction * 100.0 / music_length;
+    return if chaos_degree < 2000.0 {
+        (chaos_degree / 20.0) as i32
+    } else {
+        ((chaos_degree + 21605.0) * 100.0 / 23605.0) as i32
+    }
+
+ 
 }
 
 pub fn get_groove_radar(notes: &[Division], bpms:&[Bpm], stops: &[Stop]) -> GrooveRadar {
@@ -134,6 +202,6 @@ pub fn get_groove_radar(notes: &[Division], bpms:&[Bpm], stops: &[Stop]) -> Groo
         voltage: calc_voltage(notes, bpms, stops),
         air: calc_air(notes),
         freeze: calc_freeze(notes, bpms, stops),
-        chaos: calc_chaos(notes),
+        chaos: calc_chaos(notes, bpms, stops),
     }
 }

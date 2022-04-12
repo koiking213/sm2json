@@ -2,7 +2,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 const NOTE_UNIT: i32 = 192;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct Stop {
     pub offset: i32,
     pub time: f32,
@@ -18,7 +18,7 @@ impl FromStr for Stop {
 }
 
 // TODO: bpmの公開をやめてmaxを提供する
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct Bpm {
     pub offset: i32,
     pub bpm: f32,
