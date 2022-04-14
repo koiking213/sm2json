@@ -4,7 +4,7 @@ const NOTE_UNIT: i32 = 192;
 use crate::arrow::{Division, Color};
 use itertools::Itertools;
 use crate::gimmick::{Bpm, Stop};
-use crate::chart::{offset_to_time};
+use crate::chart::offset_to_time;
 
 // TODO: 曲の長さの定義を決める
 
@@ -15,6 +15,15 @@ pub struct GrooveRadar {
     pub air: i32,
     pub freeze: i32,
     pub chaos: i32,
+}
+
+// freezeを考慮しないといけない気がする
+fn get_music_length(notes: &[Division]) -> f32 {
+    //notes.last().unwrap().time - notes.first().unwrap().time + 9.0
+    let last_note = notes.last().unwrap();
+    let end = last_note.arrows.iter().filter(|a| a.is_freeze()).map(|a| a.end_time).fold(last_note.time, |m, v| m.max(v));
+    //end - notes.first().unwrap().time + 9.0
+    end + 1.6
 }
 
 fn count_subsequent_notes(notes: &[Division], offset: i32) -> i32 {
@@ -57,8 +66,7 @@ fn calc_max_note_density(notes: &[Division], bpms: &[Bpm]) -> i32 {
 }
 
 fn calc_stream(notes: &[Division]) -> i32 {
-    let length = notes.last().unwrap().time - notes[0].time;
-    let notes_per_min = (notes.len() as f32 / length) * 60.0;
+    let notes_per_min = (notes.len() as f32 / get_music_length(notes)) * 60.0;
     if notes_per_min < 300.0 {
         return (notes_per_min / 3.0) as i32;
     } else {
@@ -80,8 +88,7 @@ fn calc_beat_count(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
 }
 
 fn calc_average_bpm(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
-    let music_length = notes.last().unwrap().time;
-    return calc_beat_count(notes, bpms, stops) * 60.0 / music_length;
+    return calc_beat_count(notes, bpms, stops) * 60.0 / get_music_length(notes);
 }
 
 fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
@@ -98,8 +105,7 @@ fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
 fn calc_air(notes: &[Division]) -> i32{
     let jumps = notes.iter().filter(|d| d.is_jump()).count();
     let shocks = notes.iter().filter(|d| d.is_shock()).count();
-    let music_length = notes.last().unwrap().time;
-    let jump_per_min = ((jumps + shocks) as f32 / music_length) * 60.0;
+    let jump_per_min = ((jumps + shocks) as f32 / get_music_length(notes)) * 60.0;
     return if jump_per_min < 55.0 {
         (jump_per_min * 20.0 / 11.0) as i32
     } else {
@@ -181,7 +187,7 @@ fn calc_total_bpm_change(bpms: &[Bpm], stops: &[Stop]) -> f32 {
 }
 
 fn calc_chaos(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
-    let music_length = notes.last().unwrap().time;
+    let music_length = get_music_length(notes);
     let base_value = calc_chaos_base_value(notes);
     let change_per_min = calc_total_bpm_change(bpms, stops) * 60.0 / music_length;
     let change_correction = 1.0 + (change_per_min / 1500.0);
