@@ -24,8 +24,9 @@ struct Song {
     title: String,
     dir_name: String,
     charts: Vec<chart::ChartInfo>,
-    bpm: f32,
+    bpm: String,
     music: Music,
+    banner: String,
 }
 
 // TODO: chartは外部から受け取る
@@ -66,15 +67,18 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
 
     let (charts, _) = chart::sm_to_chart(filepath);
 
-    let displaybpm: f32 = match props.get("DISPLAYBPM") {
-        Some(s) => get_max_disp_bpm(s),
-        None => match bpms
-            .iter()
-            .max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap())
-        {
-            Some(bpm) => bpm.bpm,
-            None => unreachable!(),
-        },
+    let displaybpm: String = match props.get("DISPLAYBPM") {
+        Some(s) => get_disp_bpm(s),
+        None => {
+            let max = bpms.iter().max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
+            let min = bpms.iter().min_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
+            if max.bpm == min.bpm {
+                max.bpm.to_string()
+            } else {
+                format!("{}-{}", min.bpm, max.bpm)
+
+            }
+        }
     };
     return Song {
         title: props.get("TITLE").unwrap().to_string(),
@@ -90,12 +94,17 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
                 0.0
             }
         },
+        banner: props.get("BANNER").unwrap().to_string(),
     };
 }
 
-fn get_max_disp_bpm(s: &str) -> f32 {
+fn get_disp_bpm(s: &str) -> String {
     let split: Vec<&str> = s.split(':').collect();
-    split.last().unwrap().parse().unwrap()
+    if split.len() == 1 {
+        return split[0].to_string();
+    } else {
+        return format!("{}-{}", split[0], split[1]);
+    }
 }
 
 // TODO: 1つの.smファイルを1つのjsonにしたほうが楽そう
