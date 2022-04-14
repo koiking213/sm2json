@@ -9,7 +9,7 @@ use crate::gimmick::{Gimmick, Bpm, Stop, BpmDisplay, StopDisplay};
 use crate::groove_radar::{GrooveRadar, get_groove_radar};
 
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum ChartType {
     DanceSingle,
     DanceDouble,
@@ -28,10 +28,11 @@ impl FromStr for ChartType {
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum Difficulty {
+    Beginner,
     Easy,
     Medium,
     Hard,
-    Expert,
+    Challenge,
     Edit,
 }
 
@@ -39,10 +40,11 @@ impl FromStr for Difficulty {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "Beginner" => Ok(Difficulty::Beginner),
             "Easy" => Ok(Difficulty::Easy),
             "Medium" => Ok(Difficulty::Medium),
             "Hard" => Ok(Difficulty::Hard),
-            "Challenge" => Ok(Difficulty::Expert),
+            "Challenge" => Ok(Difficulty::Challenge),
             "Edit" => Ok(Difficulty::Edit),
             _ => Err(format!("{} is not supported", s)),
         }
@@ -54,7 +56,13 @@ pub struct ChartInfo {
     pub chart_type: ChartType,
     pub difficulty: Difficulty,
     pub level: i32,
-    pub groove_radar: GrooveRadar,
+    pub max_combo: i32,
+    //pub groove_radar: GrooveRadar,
+    pub stream: i32,
+    pub voltage: i32, 
+    pub air: i32,
+    pub freeze: i32,
+    pub chaos: i32,
     //notes: Vec<Division>,
 }
 
@@ -172,7 +180,13 @@ pub fn sm_to_chart(filepath: String) -> (Vec<Chart>, Gimmick) {
         .split(',')
         .map(|s| Bpm::from_str(s.trim_end()).unwrap())
         .collect();
-    let stop_str = props.get("STOPS").unwrap();
+    // unwrap_orを使いたいけどstr周りのエラーがなんもわからん
+    //let stop_str = props.get("STOPS").unwrap_or("".to_string());
+    let stop_str = if let Some(s) = props.get("STOPS") {
+        s
+    } else {
+        ""
+    };
     let stops: Vec<Stop> = if stop_str.is_empty() {
         Vec::new()
     } else {
@@ -189,6 +203,7 @@ pub fn sm_to_chart(filepath: String) -> (Vec<Chart>, Gimmick) {
     return (
         notes_content
         .iter()
+        .filter(|s| ChartType::from_str(s[0].trim_start()).unwrap() == ChartType::DanceSingle)
         .map(|s| {
             let chart_type = ChartType::from_str(s[0].trim_start()).unwrap();
             let difficulty = Difficulty::from_str(s[2].trim_start()).unwrap();
@@ -203,7 +218,12 @@ pub fn sm_to_chart(filepath: String) -> (Vec<Chart>, Gimmick) {
                 chart_type,
                 difficulty,
                 level,
-                groove_radar,
+                max_combo: notes.len() as i32,
+                stream: groove_radar.stream,
+                voltage: groove_radar.voltage,
+                air: groove_radar.air,
+                freeze: groove_radar.freeze,
+                chaos: groove_radar.chaos,
             };
             Chart {
                 info,

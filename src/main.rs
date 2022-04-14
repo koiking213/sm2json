@@ -83,7 +83,12 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
         bpm: displaybpm,
         music: Music {
             path: props.get("MUSIC").unwrap().to_string(),
-            offset: props.get("OFFSET").unwrap().parse().unwrap(),
+            // 良い書き方がありそう
+            offset: if let Some(ofs) = props.get("OFFSET") {
+                ofs.parse().unwrap()
+            } else {
+                0.0
+            }
         },
     };
 }
@@ -121,6 +126,7 @@ fn main() {
                 }
                 // 各譜面のjsonを作りつつ曲リストに追加していく
                 for file in files {
+                    println!("file: {}", file);
                     let song = sm_to_song_info(dirname.clone(), file.clone());
                     let dir_path = Path::new("output").join(&dir.path());
                     fs::create_dir_all(&dir_path).unwrap();
