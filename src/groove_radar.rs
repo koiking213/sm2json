@@ -105,11 +105,11 @@ fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
 fn calc_air(notes: &[Division]) -> i32{
     let jumps = notes.iter().filter(|d| d.is_jump()).count();
     let shocks = notes.iter().filter(|d| d.is_shock()).count();
-    let jump_per_min = ((jumps + shocks) as f32 / get_music_length(notes)) * 60.0;
+    let jump_per_min = ((jumps + shocks) * 60) as f32 / get_music_length(notes);
     return if jump_per_min < 55.0 {
         (jump_per_min * 20.0 / 11.0) as i32
     } else {
-        ((jump_per_min - 1.0) * 50.0 / 27.0) as i32
+        ((jump_per_min + 36.0) * 100.0 / 91.0) as i32
     }
 }
 
