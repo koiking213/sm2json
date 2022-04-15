@@ -143,7 +143,8 @@ fn calc_chaos_base_value(notes: &[Division]) -> f32 {
     let mut base_value = 0.0;
     for (prev_note, current_note) in notes.iter().tuple_windows() {
         let interval = current_note.offset - prev_note.offset;
-        base_value += (current_note.arrows.len() as f32) * color_weight(&current_note.color) * (NOTE_UNIT / 4 / interval) as f32;
+        let inc = (current_note.arrows.len() as f32) * color_weight(&current_note.color) * ((NOTE_UNIT / 4) as f32 / interval as f32);
+        base_value += inc;
     }
     return base_value;
 }
@@ -155,6 +156,7 @@ fn calc_total_bpm_change(bpms: &[Bpm], stops: &[Stop]) -> f32 {
         Bpm,
         Stop,
     }
+    // TODO: enumできれいに書けるかも
     #[derive(Debug)]
     struct BpmOrStop {
         offset: i32,
@@ -162,11 +164,11 @@ fn calc_total_bpm_change(bpms: &[Bpm], stops: &[Stop]) -> f32 {
         kind: Kind,
     }
     let mut gimmicks: Vec<BpmOrStop> = Vec::new();
-    for stop in stops {
-        gimmicks.push(BpmOrStop {offset: stop.offset, value: stop.time, kind: Kind::Stop});
-    }
     for bpm in bpms {
         gimmicks.push(BpmOrStop {offset: bpm.offset, value: bpm.bpm, kind: Kind::Bpm});
+    }
+    for stop in stops {
+        gimmicks.push(BpmOrStop {offset: stop.offset, value: stop.time, kind: Kind::Stop});
     }
     // TODO: stopとbpmが同じタイミングで起きる場合はstopのみ考慮する
     gimmicks.sort_by(|a,b| a.offset.cmp(&b.offset));
@@ -191,7 +193,6 @@ fn calc_chaos(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     let base_value = calc_chaos_base_value(notes);
     let change_per_min = calc_total_bpm_change(bpms, stops) * 60.0 / music_length;
     let change_correction = 1.0 + (change_per_min / 1500.0);
-
     let chaos_degree = base_value * change_correction * 100.0 / music_length;
     return if chaos_degree < 2000.0 {
         (chaos_degree / 20.0) as i32
