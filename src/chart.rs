@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use crate::arrow::{Arrow, ArrowType, Division, NOTE_UNIT, bar_to_divisions, find_freeze_end};
 use crate::gimmick::{Gimmick, Bpm, Stop, BpmDisplay, StopDisplay};
-use crate::groove_radar::{GrooveRadar, get_groove_radar};
+use crate::groove_radar::get_groove_radar;
 
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]

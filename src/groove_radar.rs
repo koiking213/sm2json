@@ -37,7 +37,7 @@ fn count_subsequent_notes(notes: &[Division], offset: i32) -> i32 {
             break;
         }
     }
-    return count;
+    count
 }
 
 // bpm_offsets: 20, 30, 34
@@ -47,30 +47,30 @@ fn create_bpm_section_list(notes: &[Division], bpms: &[Bpm]) -> Vec<Vec<Division
     let mut partitions: Vec<i32> = bpms.iter().map(|bpm| bpm.offset).collect();
     partitions.push(notes.last().unwrap().offset);
     let ranges = partitions.windows(2).map(|pair| (pair[0], pair[1]));
-    return ranges.map(|range| 
+    ranges.map(|range| 
         notes.iter().filter(|div| div.offset >= range.0 && div.offset < range.1).cloned().collect()
-    ).collect();
+    ).collect()
 }
 
 fn calc_max_notes_in_bpm_section(section: &[Division]) -> i32 {
-    return if section.is_empty() {
+    if section.is_empty() {
         0
     } else {
         section.iter().map(|d| count_subsequent_notes(section, d.offset)).max().unwrap()
-    };
+    }
 }
 
 fn calc_max_note_density(notes: &[Division], bpms: &[Bpm]) -> i32 {
     let bpm_section_list = create_bpm_section_list(notes, bpms);
-    return bpm_section_list.iter().map(|s| calc_max_notes_in_bpm_section(s)).max().unwrap();
+    bpm_section_list.iter().map(|s| calc_max_notes_in_bpm_section(s)).max().unwrap()
 }
 
 fn calc_stream(notes: &[Division]) -> i32 {
     let notes_per_min = (notes.len() as f32 / get_music_length(notes)) * 60.0;
     if notes_per_min < 300.0 {
-        return (notes_per_min / 3.0) as i32;
+        (notes_per_min / 3.0) as i32
     } else {
-        return ((notes_per_min - 139.0) * 100.0 / 161.0) as i32;
+        ((notes_per_min - 139.0) * 100.0 / 161.0) as i32
     }
 }
 
@@ -84,11 +84,11 @@ fn calc_beat_count(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
         let end = offset_to_time(next_bpm.offset, bpms, stops);
         num_beats += (end - start) * current_bpm.bpm;
     }
-    return num_beats / 60.0;
+    num_beats / 60.0
 }
 
 fn calc_average_bpm(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> f32 {
-    return calc_beat_count(notes, bpms, stops) * 60.0 / get_music_length(notes);
+    calc_beat_count(notes, bpms, stops) * 60.0 / get_music_length(notes)
 }
 
 fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
@@ -96,9 +96,9 @@ fn calc_voltage(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     let average_bpm = calc_average_bpm(notes, bpms, stops);
     let max_density_per_min = (max_density as f32) * average_bpm / 4.0;
     if max_density_per_min < 600.0 {
-        return (max_density_per_min / 6.0) as i32;
+        (max_density_per_min / 6.0) as i32
     } else {
-        return ((max_density_per_min + 594.0) * 100.0 / 1194.0) as i32;
+        ((max_density_per_min + 594.0) * 100.0 / 1194.0) as i32
     }
 }
 
@@ -106,7 +106,7 @@ fn calc_air(notes: &[Division]) -> i32{
     let jumps = notes.iter().filter(|d| d.is_jump()).count();
     let shocks = notes.iter().filter(|d| d.is_shock()).count();
     let jump_per_min = ((jumps + shocks) * 60) as f32 / get_music_length(notes);
-    return if jump_per_min < 55.0 {
+    if jump_per_min < 55.0 {
         (jump_per_min * 20.0 / 11.0) as i32
     } else {
         ((jump_per_min + 36.0) * 100.0 / 91.0) as i32
@@ -117,13 +117,10 @@ fn calc_freeze(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     let total_len: i32 = notes.iter().map(|d| {
         // 良い書き方がありそう
         let len = d.arrows.iter().filter(|a| a.is_freeze()).map(|a| a.end - d.offset).max();
-        match len {
-            Some(len) => len,
-            None => 0,
-        }
+        len.unwrap_or(0)
     }).sum::<i32>() / (NOTE_UNIT/4);
     let freeze_ratio = (10000 * total_len) as f32 / calc_beat_count(notes, bpms, stops);
-    return if freeze_ratio < 3500.0 {
+    if freeze_ratio < 3500.0 {
         (freeze_ratio / 35.0) as i32
     } else {
         ((freeze_ratio + 2484.0) * 100.0 / 5984.0) as i32
@@ -146,7 +143,7 @@ fn calc_chaos_base_value(notes: &[Division]) -> f32 {
         let inc = (current_note.arrows.len() as f32) * color_weight(&current_note.color) * ((NOTE_UNIT / 4) as f32 / interval as f32);
         base_value += inc;
     }
-    return base_value;
+    base_value
 }
 
 fn calc_total_bpm_change(bpms: &[Bpm], stops: &[Stop]) -> f32 {
@@ -194,7 +191,7 @@ fn calc_chaos(notes: &[Division], bpms: &[Bpm], stops: &[Stop]) -> i32{
     let change_per_min = calc_total_bpm_change(bpms, stops) * 60.0 / music_length;
     let change_correction = 1.0 + (change_per_min / 1500.0);
     let chaos_degree = base_value * change_correction * 100.0 / music_length;
-    return if chaos_degree < 2000.0 {
+    if chaos_degree < 2000.0 {
         (chaos_degree / 20.0) as i32
     } else {
         ((chaos_degree + 21605.0) * 100.0 / 23605.0) as i32

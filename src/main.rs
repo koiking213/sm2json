@@ -72,7 +72,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
         None => {
             let max = bpms.iter().max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
             let min = bpms.iter().min_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
-            if max.bpm == min.bpm {
+            if (max.bpm - min.bpm).abs() < 0.1 {
                 max.bpm.to_string()
             } else {
                 format!("{}-{}", min.bpm, max.bpm)
@@ -80,7 +80,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
             }
         }
     };
-    return Song {
+    Song {
         title: props.get("TITLE").unwrap().to_string(),
         dir_name: dirname,
         charts: charts.iter().map(|chart| chart.info).collect(),
@@ -95,15 +95,15 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
             }
         },
         banner: props.get("BANNER").unwrap().to_string(),
-    };
+    }
 }
 
 fn get_disp_bpm(s: &str) -> String {
     let split: Vec<&str> = s.split(':').collect();
     if split.len() == 1 {
-        return split[0].to_string();
+        split[0].to_string()
     } else {
-        return format!("{}-{}", split[0], split[1]);
+        format!("{}-{}", split[0], split[1])
     }
 }
 
