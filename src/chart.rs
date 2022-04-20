@@ -99,12 +99,14 @@ fn str_to_notes(bars: Vec<&str>, bpms: &[Bpm], stops: &[Stop]) -> Vec<Division> 
             if arrow.arrow_type == ArrowType::Freeze {
                 end = find_freeze_end(&notes, div.offset, arrow.direction);
             }
-            arrows.push(Arrow {
-                direction: arrow.direction,
-                arrow_type: arrow.arrow_type,
-                end,
-                end_time: offset_to_time(end, bpms, stops),
-            });
+            if arrow.arrow_type != ArrowType::FreezeEnd {
+                arrows.push(Arrow {
+                    direction: arrow.direction,
+                    arrow_type: arrow.arrow_type,
+                    end,
+                    end_time: offset_to_time(end, bpms, stops),
+                });
+            }
         }
         // dont add if all arrows are freeze end
         if arrows.iter().any(|x| x.arrow_type != ArrowType::FreezeEnd) {
