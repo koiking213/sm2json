@@ -78,9 +78,9 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
             let max = bpms.iter().max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
             let min = bpms.iter().min_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
             if (max.bpm - min.bpm).abs() < 0.1 {
-                (max.bpm as i32).to_string()
+                max.bpm.round().to_string()
             } else {
-                format!("{}-{}", min.bpm as i32, max.bpm as i32)
+                format!("{}-{}", min.bpm.round(), max.bpm.round())
 
             }
         }
@@ -111,11 +111,11 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
 fn get_disp_bpm(s: &str) -> String {
     let split: Vec<&str> = s.split(':').collect();
     if split.len() == 1 {
-        (split[0].parse::<f32>().unwrap() as i32).to_string()
+        split[0].parse::<f32>().unwrap().round().to_string()
     } else {
         let min = split[0].parse::<f32>().unwrap();
         let max = split[1].parse::<f32>().unwrap();
-        format!("{}-{}", min as i32, max as i32)
+        format!("{}-{}", min.round(), max.round())
     }
 }
 
