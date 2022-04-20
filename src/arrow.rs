@@ -49,6 +49,7 @@ impl FromStr for ArrowType {
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Arrow {
     pub direction: Direction,
+    #[serde(rename = "type")]
     pub arrow_type: ArrowType,
     pub end: i32,
     pub end_time: f32,
