@@ -148,7 +148,7 @@ pub fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
     time
 }
 
-pub fn sm_to_chart(filepath: String) -> (Vec<Chart>, Gimmick) {
+pub fn sm_to_chart(filepath: &String) -> (Vec<Chart>, Gimmick) {
     let contents = fs::read_to_string(filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents

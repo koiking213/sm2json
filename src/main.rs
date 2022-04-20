@@ -2,8 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use filetime::FileTime;
 use std::path::Path;
 use std::str::FromStr;
+use chrono::prelude::DateTime;
+use std::time::{UNIX_EPOCH, Duration};
+
 pub mod arrow;
 pub mod gimmick;
 pub mod chart;
@@ -27,6 +31,7 @@ struct Song {
     bpm: String,
     music: Music,
     banner: String,
+    timestamp: String,
 }
 
 // TODO: chartは外部から受け取る
@@ -65,7 +70,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
         .map(|s| gimmick::Bpm::from_str(s.trim_end()).unwrap())
         .collect();
 
-    let (charts, _) = chart::sm_to_chart(filepath);
+    let (charts, _) = chart::sm_to_chart(&filepath);
 
     let displaybpm: String = match props.get("DISPLAYBPM") {
         Some(s) => get_disp_bpm(s),
@@ -80,6 +85,10 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
             }
         }
     };
+    let metadata = fs::metadata(&filepath).unwrap();
+    let time = FileTime::from_last_modification_time(&metadata).seconds();
+    let d = UNIX_EPOCH + Duration::from_secs(time as u64);
+    let timestamp = DateTime::<chrono::Local>::from(d).format("%Y-%m-%d %H:%M:%S").to_string();
     Song {
         title: props.get("TITLE").unwrap().to_string(),
         dir_name: dirname,
@@ -95,6 +104,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
             }
         },
         banner: props.get("BANNER").unwrap().to_string(),
+        timestamp,
     }
 }
 
@@ -141,7 +151,7 @@ fn main() {
                     let song = sm_to_song_info(dirname.clone(), file.clone());
                     let dir_path = Path::new("output").join(&dir.path());
                     fs::create_dir_all(&dir_path).unwrap();
-                    let (charts, gimmick) = chart::sm_to_chart(file.clone());
+                    let (charts, gimmick) = chart::sm_to_chart(&file);
                     // 譜面ごとのjsonを作成
                     for chart in &charts {
                         let mut chart_path = dir_path.clone();
