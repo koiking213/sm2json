@@ -150,8 +150,131 @@ pub fn offset_to_time(offset: i32, bpms: &[Bpm], stops: &[Stop]) -> f32 {
     }
     time
 }
+struct ChartProps {
+    props: HashMap<String, String>,
+    note_strings: String,
+}
+fn parse_chart_props(chart_string: &&str) -> ChartProps {
+    let mut props = HashMap::new();
+    let mut note_strings = "".to_string();
+    let statements: Vec<&str> = chart_string.split(';').collect();
+    for statement in statements {
+        let parts: Vec<&str> = statement.trim().split(':').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let key = parts[0].trim_matches('#');
+        let value = parts[1..].join(":");
 
-pub fn sm_to_chart(filepath: &String) -> Vec<Chart> {
+        if key == "NOTES" {
+            note_strings = value.to_string();
+        } else {
+            props.insert(key.to_string(), value.to_string());
+        }
+    }
+    ChartProps { props, note_strings }
+}
+
+pub fn create_chart(filepath: &String) -> Vec<Chart> {
+    if filepath.ends_with(".sm") {
+        sm_to_chart(filepath)
+    } else if filepath.ends_with(".ssc") {
+        ssc_to_chart(filepath)
+    } else {
+        panic!("unsupported file format");
+    }
+}
+
+fn ssc_to_chart(filepath: &String) -> Vec<Chart> {
+    let contents = fs::read_to_string(filepath).expect("file open error");
+    // remove comment
+    let statements_without_comment: Vec<&str> = contents
+        .split('\n')
+        .filter(|s| !s.starts_with("//"))
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let contents_without_comment: String = statements_without_comment.join("\n");
+    let chart_strings: Vec<&str> = contents_without_comment.split("#NOTEDATA:;").collect(); // (head, tail) = ... みたいに書きたい
+    let common_statements: Vec<&str> = chart_strings[0].split(';').collect();
+    let mut common_props = HashMap::new();
+    let mut chart_props: Vec<ChartProps> = Vec::new();
+    for statement in common_statements {
+        let parts: Vec<&str> = statement.trim().split(':').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let key = parts[0].trim_matches('#');
+        let value = parts[1..].join(":");
+        common_props.insert(key.to_string(), value.to_string());
+    }
+    for chart_string in chart_strings.iter().skip(1) {
+        let chart = parse_chart_props(chart_string);
+       chart_props.push(chart);
+    }
+
+    return 
+       chart_props 
+        .iter()
+        .filter(|c| ChartType::from_str(c.props.get("STEPSTYPE").unwrap()).unwrap() == ChartType::DanceSingle)
+        .map(|c| {
+            let chart_type = ChartType::from_str(c.props.get("STEPSTYPE").unwrap()).unwrap();
+            let difficulty = Difficulty::from_str(c.props.get("DIFFICULTY").unwrap()).unwrap();
+            let bpms: Vec<Bpm> = if let Some(s) = c.props.get("BPMS") {
+                s.split(',').map(|s| Bpm::from_str(s.trim_end()).unwrap()).collect()
+            } else {
+                common_props.get("BPMS").unwrap().split(',').map(|s| Bpm::from_str(s.trim_end()).unwrap()).collect()
+            };
+            // unwrap_orを使いたいけどstr周りのエラーがなんもわからん
+            //let stop_str = props.get("STOPS").unwrap_or("".to_string());
+            let stop_str = if let Some(s) = c.props.get("STOPS") {
+                s
+            } else {
+                ""
+            };
+            let stops: Vec<Stop> = if stop_str.is_empty() {
+                Vec::new()
+            } else {
+                stop_str
+                    .split(',')
+                    .map(|s| Stop::from_str(s.trim_end()).unwrap())
+                    .collect()
+            };
+            let level = c.props.get("METER").unwrap().parse().unwrap();
+            let notes = str_to_notes(
+                c.note_strings.split(',').map(|s| s.trim_start()).collect(),
+                &bpms,
+                &stops,
+            );
+            let groove_radar = get_groove_radar(&notes, &bpms, &stops);
+            let info = ChartInfo {
+                chart_type,
+                difficulty,
+                level,
+                max_combo: notes.len() as i32,
+                stream: groove_radar.stream,
+                voltage: groove_radar.voltage,
+                air: groove_radar.air,
+                freeze: groove_radar.freeze,
+                chaos: groove_radar.chaos,
+            };
+            Chart {
+                info,
+                content: LegacyChartContent {
+                    stream: notes,
+                    stream_info: Vec::new(),
+                    gimmick: Gimmick {
+                        soflan: bpms.clone().into_iter().map(BpmDisplay::from_bpm).collect(),
+                        stop: stops.clone().into_iter().map(StopDisplay::from_stop).collect(),
+                    }
+                },
+            }
+        })
+        .collect();
+}
+
+
+fn sm_to_chart(filepath: &String) -> Vec<Chart> {
     let contents = fs::read_to_string(filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents

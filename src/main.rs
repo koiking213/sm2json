@@ -4,7 +4,6 @@ use std::env;
 use std::fs;
 use filetime::FileTime;
 use std::path::Path;
-use std::str::FromStr;
 use chrono::prelude::DateTime;
 use std::time::{UNIX_EPOCH, Duration};
 
@@ -35,7 +34,7 @@ struct Song {
 }
 
 // TODO: chartは外部から受け取る
-fn sm_to_song_info(dirname: String, filepath: String) -> Song {
+fn create_song_info(dirname: String, filepath: String) -> Song {
     let contents = fs::read_to_string(&filepath).expect("file open error");
     // remove comment
     let statements_without_comment: Vec<&str> = contents
@@ -62,25 +61,19 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
         }
     }
 
+    let charts = chart::create_chart(&filepath);
     // TODO: .ssc形式に対応するなら、BPM情報はChartInfoに含まれるべき
-    let bpms: Vec<gimmick::Bpm> = props
-        .get("BPMS")
-        .unwrap()
-        .split(',')
-        .map(|s| gimmick::Bpm::from_str(s.trim_end()).unwrap())
-        .collect();
-
-    let charts = chart::sm_to_chart(&filepath);
+    let bpms: Vec<f32> = charts[0].content.gimmick.soflan.iter().map(|s| s.bpm).collect();
 
     let displaybpm: String = match props.get("DISPLAYBPM") {
         Some(s) => get_disp_bpm(s),
         None => {
-            let max = bpms.iter().max_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
-            let min = bpms.iter().min_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap()).unwrap();
-            if (max.bpm - min.bpm).abs() < 0.1 {
-                max.bpm.round().to_string()
+            let max = bpms.iter().max_by(|a, b| a.partial_cmp(&b).unwrap()).unwrap();
+            let min = bpms.iter().min_by(|a, b| a.partial_cmp(&b).unwrap()).unwrap();
+            if (max - min).abs() < 0.1 {
+                max.round().to_string()
             } else {
-                format!("{}-{}", min.bpm.round(), max.bpm.round())
+                format!("{}-{}", min.round(), max.round())
 
             }
         }
@@ -135,7 +128,7 @@ fn main() {
                         for file in dirs {
                             let file = file.unwrap();
                             let filename = file.file_name().into_string().unwrap();
-                            if filename.ends_with(".sm") {
+                            if filename.ends_with(".sm") || filename.ends_with(".ssc") {
                                 let path = Path::new(&dir.path()).join(filename);
                                 files.push(path.to_str().unwrap().to_string());
                             }
@@ -148,10 +141,10 @@ fn main() {
                 // 各譜面のjsonを作りつつ曲リストに追加していく
                 for file in files {
                     println!("file: {}", file);
-                    let song = sm_to_song_info(dirname.clone(), file.clone());
+                    let song = create_song_info(dirname.clone(), file.clone());
                     let dir_path = Path::new("output").join(&dir.path());
                     fs::create_dir_all(&dir_path).unwrap();
-                    let charts = chart::sm_to_chart(&file);
+                    let charts = chart::create_chart(&file);
                     // 譜面ごとのjsonを作成
                     for chart in &charts {
                         let mut chart_path = dir_path.clone();
