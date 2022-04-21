@@ -70,7 +70,7 @@ fn sm_to_song_info(dirname: String, filepath: String) -> Song {
         .map(|s| gimmick::Bpm::from_str(s.trim_end()).unwrap())
         .collect();
 
-    let (charts, _) = chart::sm_to_chart(&filepath);
+    let charts = chart::sm_to_chart(&filepath);
 
     let displaybpm: String = match props.get("DISPLAYBPM") {
         Some(s) => get_disp_bpm(s),
@@ -151,7 +151,7 @@ fn main() {
                     let song = sm_to_song_info(dirname.clone(), file.clone());
                     let dir_path = Path::new("output").join(&dir.path());
                     fs::create_dir_all(&dir_path).unwrap();
-                    let (charts, gimmick) = chart::sm_to_chart(&file);
+                    let charts = chart::sm_to_chart(&file);
                     // 譜面ごとのjsonを作成
                     for chart in &charts {
                         let mut chart_path = dir_path.clone();
@@ -160,8 +160,6 @@ fn main() {
                         let chart_json = serde_json::to_string(&chart.content).unwrap();
                         fs::write(chart_path, chart_json).unwrap();
                     }
-                    // 曲のギミック情報を作成 (TODO: .ssc対応時にはギミックは譜面ごとに作成する)
-                    fs::write(dir_path.join("gimmick.json"), serde_json::to_string(&gimmick).unwrap()).unwrap();
 
                     // 曲リスト更新
                     songs.push(song);
